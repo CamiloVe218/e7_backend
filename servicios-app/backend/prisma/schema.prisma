@@ -1,0 +1,151 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CLIENTE
+  PROVEEDOR
+  ADMIN
+}
+
+enum RequestStatus {
+  PENDIENTE
+  ACEPTADA
+  EN_PROCESO
+  FINALIZADA
+  CANCELADA
+}
+
+enum PaymentStatus {
+  PENDIENTE
+  COMPLETADO
+  FALLIDO
+  REEMBOLSADO
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(CLIENTE)
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  provider        Provider?
+  serviceRequests ServiceRequest[] @relation("ClientRequests")
+  ratings         Rating[]         @relation("ClientRatings")
+
+  @@map("users")
+}
+
+model Provider {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  bio         String?
+  rating      Float    @default(0)
+  isAvailable Boolean  @default(true)
+  lat         Float?
+  lng         Float?
+  serviceType String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user            User             @relation(fields: [userId], references: [id])
+  serviceRequests ServiceRequest[] @relation("ProviderRequests")
+  availability    Availability[]
+  ratingsReceived Rating[]         @relation("ProviderRatings")
+
+  @@map("providers")
+}
+
+model Service {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String
+  category    String
+  basePrice   Float
+  imageUrl    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  serviceRequests ServiceRequest[]
+
+  @@map("services")
+}
+
+model ServiceRequest {
+  id             String        @id @default(cuid())
+  clientId       String
+  serviceId      String
+  providerId     String?
+  status         RequestStatus @default(PENDIENTE)
+  description    String
+  address        String
+  lat            Float
+  lng            Float
+  scheduledAt    DateTime?
+  price          Float?
+  paymentMethod  String?       @default("EFECTIVO") @db.VarChar(50)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  client   User      @relation("ClientRequests", fields: [clientId], references: [id])
+  service  Service   @relation(fields: [serviceId], references: [id])
+  provider Provider? @relation("ProviderRequests", fields: [providerId], references: [id])
+  payment  Payment?
+  rating   Rating?
+
+  @@map("service_requests")
+}
+
+model Payment {
+  id               String        @id @default(cuid())
+  serviceRequestId String        @unique
+  amount           Float
+  status           PaymentStatus @default(PENDIENTE)
+  method           String        @default("SIMULADO")
+  transactionId    String?       @unique
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  serviceRequest ServiceRequest @relation(fields: [serviceRequestId], references: [id])
+
+  @@map("payments")
+}
+
+model Rating {
+  id               String   @id @default(cuid())
+  serviceRequestId String   @unique
+  clientId         String
+  providerId       String
+  score            Int
+  comment          String?
+  createdAt        DateTime @default(now())
+
+  serviceRequest ServiceRequest @relation(fields: [serviceRequestId], references: [id])
+  client         User           @relation("ClientRatings", fields: [clientId], references: [id])
+  provider       Provider       @relation("ProviderRatings", fields: [providerId], references: [id])
+
+  @@map("ratings")
+}
+
+model Availability {
+  id         String   @id @default(cuid())
+  providerId String
+  dayOfWeek  Int
+  startTime  String
+  endTime    String
+  createdAt  DateTime @default(now())
+
+  provider Provider @relation(fields: [providerId], references: [id])
+
+  @@map("availability")
+}
