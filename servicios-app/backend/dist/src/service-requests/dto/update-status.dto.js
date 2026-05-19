@@ -11,6 +11,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UpdateStatusDto = exports.RequestStatus = void 0;
 const class_validator_1 = require("class-validator");
+const swagger_1 = require("@nestjs/swagger");
 var RequestStatus;
 (function (RequestStatus) {
     RequestStatus["PENDIENTE"] = "PENDIENTE";
@@ -23,6 +24,7 @@ class UpdateStatusDto {
 }
 exports.UpdateStatusDto = UpdateStatusDto;
 __decorate([
+    (0, swagger_1.ApiProperty)({ enum: RequestStatus, description: 'Nuevo estado de la solicitud' }),
     (0, class_validator_1.IsEnum)(RequestStatus, { message: 'Estado inválido' }),
     __metadata("design:type", String)
 ], UpdateStatusDto.prototype, "status", void 0);

@@ -12,43 +12,52 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateRequestDto = void 0;
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
+const swagger_1 = require("@nestjs/swagger");
 class CreateRequestDto {
 }
 exports.CreateRequestDto = CreateRequestDto;
 __decorate([
+    (0, swagger_1.ApiProperty)({ example: 'uuid-del-servicio' }),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], CreateRequestDto.prototype, "serviceId", void 0);
 __decorate([
+    (0, swagger_1.ApiProperty)({ example: 'Necesito arreglar una gotera en el techo', minLength: 10 }),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.MinLength)(10, { message: 'La descripción debe tener al menos 10 caracteres' }),
     __metadata("design:type", String)
 ], CreateRequestDto.prototype, "description", void 0);
 __decorate([
+    (0, swagger_1.ApiProperty)({ example: 'Av. Reforma 123, Col. Centro' }),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], CreateRequestDto.prototype, "address", void 0);
 __decorate([
+    (0, swagger_1.ApiProperty)({ example: 19.4326 }),
     (0, class_validator_1.IsNumber)(),
     (0, class_transformer_1.Type)(() => Number),
     __metadata("design:type", Number)
 ], CreateRequestDto.prototype, "lat", void 0);
 __decorate([
+    (0, swagger_1.ApiProperty)({ example: -99.1332 }),
     (0, class_validator_1.IsNumber)(),
     (0, class_transformer_1.Type)(() => Number),
     __metadata("design:type", Number)
 ], CreateRequestDto.prototype, "lng", void 0);
 __decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: '2026-06-01T10:00:00.000Z' }),
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], CreateRequestDto.prototype, "scheduledAt", void 0);
 __decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: 350 }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsNumber)(),
     (0, class_transformer_1.Type)(() => Number),
     __metadata("design:type", Number)
 ], CreateRequestDto.prototype, "price", void 0);
 __decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: 'EFECTIVO', enum: ['EFECTIVO', 'TARJETA', 'TRANSFERENCIA'] }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)

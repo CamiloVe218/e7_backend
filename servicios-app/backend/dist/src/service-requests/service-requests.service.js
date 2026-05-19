@@ -13,20 +13,11 @@ exports.ServiceRequestsService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 const notifications_gateway_1 = require("../notifications/notifications.gateway");
-const REQUEST_INCLUDE = {
-    service: true,
-    client: { select: { id: true, name: true, email: true, phone: true } },
-    provider: {
-        include: {
-            user: { select: { id: true, name: true, email: true, phone: true } },
-        },
-    },
-    payment: true,
-    rating: true,
-};
+const service_request_repository_1 = require("./repositories/service-request.repository");
 let ServiceRequestsService = class ServiceRequestsService {
-    constructor(prisma, notifications) {
+    constructor(prisma, repository, notifications) {
         this.prisma = prisma;
+        this.repository = repository;
         this.notifications = notifications;
     }
     async create(clientId, dto) {
@@ -36,19 +27,16 @@ let ServiceRequestsService = class ServiceRequestsService {
         if (!service) {
             throw new common_1.NotFoundException('Servicio no encontrado');
         }
-        const request = await this.prisma.serviceRequest.create({
-            data: {
-                clientId,
-                serviceId: dto.serviceId,
-                description: dto.description,
-                address: dto.address,
-                lat: dto.lat,
-                lng: dto.lng,
-                price: dto.price || service.basePrice,
-                paymentMethod: dto.paymentMethod || 'EFECTIVO',
-                scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
-            },
-            include: REQUEST_INCLUDE,
+        const request = await this.repository.create({
+            clientId,
+            serviceId: dto.serviceId,
+            description: dto.description,
+            address: dto.address,
+            lat: dto.lat,
+            lng: dto.lng,
+            price: dto.price || service.basePrice,
+            paymentMethod: dto.paymentMethod || 'EFECTIVO',
+            scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
         });
         this.notifications.notifyAll('request:new', request);
         return request;
@@ -81,17 +69,10 @@ let ServiceRequestsService = class ServiceRequestsService {
                 }
             }
         }
-        return this.prisma.serviceRequest.findMany({
-            where,
-            include: REQUEST_INCLUDE,
-            orderBy: { createdAt: 'desc' },
-        });
+        return this.repository.findMany({ where });
     }
     async findOne(id) {
-        const request = await this.prisma.serviceRequest.findUnique({
-            where: { id },
-            include: REQUEST_INCLUDE,
-        });
+        const request = await this.repository.findOne(id);
         if (!request) {
             throw new common_1.NotFoundException('Solicitud no encontrada');
         }
@@ -104,7 +85,7 @@ let ServiceRequestsService = class ServiceRequestsService {
         if (!provider) {
             throw new common_1.ForbiddenException('Solo proveedores pueden aceptar solicitudes');
         }
-        return this.prisma.$transaction(async (tx) => {
+        return this.repository.transaction(async (tx) => {
             const activeRequest = await tx.serviceRequest.findFirst({
                 where: {
                     providerId: provider.id,
@@ -129,7 +110,7 @@ let ServiceRequestsService = class ServiceRequestsService {
                     providerId: provider.id,
                     status: 'ACEPTADA',
                 },
-                include: REQUEST_INCLUDE,
+                include: service_request_repository_1.REQUEST_INCLUDE,
             });
             await tx.provider.update({
                 where: { id: provider.id },
@@ -141,10 +122,7 @@ let ServiceRequestsService = class ServiceRequestsService {
         });
     }
     async updateStatus(requestId, userId, dto) {
-        const request = await this.prisma.serviceRequest.findUnique({
-            where: { id: requestId },
-            include: { provider: true },
-        });
+        const request = await this.repository.findOne(requestId);
         if (!request) {
             throw new common_1.NotFoundException('Solicitud no encontrada');
         }
@@ -165,11 +143,7 @@ let ServiceRequestsService = class ServiceRequestsService {
         if (!allowed || !allowed.includes(dto.status)) {
             throw new common_1.ConflictException(`No se puede cambiar de ${request.status} a ${dto.status}`);
         }
-        const updated = await this.prisma.serviceRequest.update({
-            where: { id: requestId },
-            data: { status: dto.status },
-            include: REQUEST_INCLUDE,
-        });
+        const updated = await this.repository.update(requestId, { status: dto.status });
         if (dto.status === 'FINALIZADA' || dto.status === 'CANCELADA') {
             if (request.providerId) {
                 await this.prisma.provider.update({
@@ -180,7 +154,7 @@ let ServiceRequestsService = class ServiceRequestsService {
         }
         this.notifications.notifyUser(request.clientId, 'request:status_changed', updated);
         if (request.provider) {
-            this.notifications.notifyUser(request.provider.userId, 'request:status_changed', updated);
+            this.notifications.notifyUser(request.provider.user.id, 'request:status_changed', updated);
         }
         this.notifications.notifyAll('request:updated', updated);
         return updated;
@@ -200,20 +174,16 @@ let ServiceRequestsService = class ServiceRequestsService {
                 where.status = { in: ['FINALIZADA', 'CANCELADA'] };
             }
         }
-        return this.prisma.serviceRequest.findMany({
-            where,
-            include: REQUEST_INCLUDE,
-            orderBy: { updatedAt: 'desc' },
-        });
+        return this.repository.findMany({ where, orderBy: { updatedAt: 'desc' } });
     }
     async getStats() {
         const [total, pending, accepted, inProcess, completed, cancelled] = await Promise.all([
-            this.prisma.serviceRequest.count(),
-            this.prisma.serviceRequest.count({ where: { status: 'PENDIENTE' } }),
-            this.prisma.serviceRequest.count({ where: { status: 'ACEPTADA' } }),
-            this.prisma.serviceRequest.count({ where: { status: 'EN_PROCESO' } }),
-            this.prisma.serviceRequest.count({ where: { status: 'FINALIZADA' } }),
-            this.prisma.serviceRequest.count({ where: { status: 'CANCELADA' } }),
+            this.repository.count(),
+            this.repository.count({ status: 'PENDIENTE' }),
+            this.repository.count({ status: 'ACEPTADA' }),
+            this.repository.count({ status: 'EN_PROCESO' }),
+            this.repository.count({ status: 'FINALIZADA' }),
+            this.repository.count({ status: 'CANCELADA' }),
         ]);
         return { total, pending, accepted, inProcess, completed, cancelled };
     }
@@ -222,6 +192,7 @@ exports.ServiceRequestsService = ServiceRequestsService;
 exports.ServiceRequestsService = ServiceRequestsService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        service_request_repository_1.ServiceRequestRepository,
         notifications_gateway_1.NotificationsGateway])
 ], ServiceRequestsService);
 //# sourceMappingURL=service-requests.service.js.map

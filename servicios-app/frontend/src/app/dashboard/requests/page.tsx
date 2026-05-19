@@ -8,9 +8,9 @@ import { RequestCard } from '@/components/requests/RequestCard';
 import { ServiceRequestDrawer } from '@/components/requests/ServiceRequestDrawer';
 
 const FILTERS = [
-  { label: 'Todas', value: '' },
+  { label: 'Todas',      value: '' },
   { label: 'Pendientes', value: 'PENDIENTE' },
-  { label: 'Aceptadas', value: 'ACEPTADA' },
+  { label: 'Aceptadas',  value: 'ACEPTADA' },
   { label: 'En proceso', value: 'EN_PROCESO' },
   { label: 'Finalizadas', value: 'FINALIZADA' },
   { label: 'Canceladas', value: 'CANCELADA' },
@@ -55,35 +55,38 @@ export default function RequestsPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
+
+      {/* Page header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-bold text-white tracking-tight">Mis solicitudes</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="font-tight text-2xl font-bold text-gray-900 tracking-tight">Mis solicitudes</h1>
+          <p className="text-sm text-gray-400 mt-1">
             {requests.length} {requests.length === 1 ? 'solicitud' : 'solicitudes'}
           </p>
         </div>
         {user?.role === 'CLIENTE' && (
           <button
             onClick={() => setDrawerOpen(true)}
-            className="flex items-center gap-2 h-9 px-4 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors"
+            className="flex items-center gap-2 h-9 px-4 text-sm font-semibold rounded-xl bg-gray-900 hover:bg-gray-800 text-white transition-colors"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
             </svg>
             Nueva solicitud
           </button>
         )}
       </div>
 
-      <div className="flex gap-1 flex-wrap">
+      {/* Filter pills */}
+      <div className="flex gap-1.5 flex-wrap">
         {FILTERS.map(f => (
           <button
             key={f.value}
             onClick={() => { setActiveFilter(f.value); setLoading(true); }}
-            className={`h-8 px-3 text-xs font-medium rounded-lg transition-colors ${
+            className={`h-8 px-3 text-xs font-semibold rounded-lg transition-all duration-150 ${
               activeFilter === f.value
-                ? 'bg-gray-800 text-white border border-gray-700'
-                : 'text-gray-500 hover:text-gray-300 border border-transparent hover:border-gray-800'
+                ? 'bg-gray-900 text-white'
+                : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-gray-800'
             }`}
           >
             {f.label}
@@ -91,18 +94,19 @@ export default function RequestsPage() {
         ))}
       </div>
 
+      {/* Content */}
       {loading ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map(i => (
-            <div key={i} className="h-36 rounded-xl bg-gray-900 border border-gray-800 animate-pulse" />
+            <div key={i} className="h-36 rounded-xl bg-gray-200 animate-pulse" />
           ))}
         </div>
       ) : requests.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 rounded-xl border border-gray-800 border-dashed">
-          <svg className="w-8 h-8 text-gray-700 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="flex flex-col items-center justify-center py-20 rounded-xl border border-dashed border-gray-200 bg-white">
+          <svg className="w-8 h-8 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
-          <p className="text-sm text-gray-600">No hay solicitudes</p>
+          <p className="text-sm text-gray-400">No hay solicitudes</p>
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

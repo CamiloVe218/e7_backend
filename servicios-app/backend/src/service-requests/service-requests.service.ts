@@ -8,24 +8,17 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateRequestDto } from './dto/create-request.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
-
-const REQUEST_INCLUDE = {
-  service: true,
-  client: { select: { id: true, name: true, email: true, phone: true } },
-  provider: {
-    include: {
-      user: { select: { id: true, name: true, email: true, phone: true } },
-    },
-  },
-  payment: true,
-  rating: true,
-};
+import {
+  ServiceRequestRepository,
+  REQUEST_INCLUDE,
+} from './repositories/service-request.repository';
 
 @Injectable()
 export class ServiceRequestsService {
   constructor(
-    private prisma: PrismaService,
-    private notifications: NotificationsGateway,
+    private readonly prisma: PrismaService,
+    private readonly repository: ServiceRequestRepository,
+    private readonly notifications: NotificationsGateway,
   ) {}
 
   async create(clientId: string, dto: CreateRequestDto) {
@@ -37,19 +30,16 @@ export class ServiceRequestsService {
       throw new NotFoundException('Servicio no encontrado');
     }
 
-    const request = await this.prisma.serviceRequest.create({
-      data: {
-        clientId,
-        serviceId: dto.serviceId,
-        description: dto.description,
-        address: dto.address,
-        lat: dto.lat,
-        lng: dto.lng,
-        price: dto.price || service.basePrice,
-        paymentMethod: dto.paymentMethod || 'EFECTIVO',
-        scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
-      },
-      include: REQUEST_INCLUDE,
+    const request = await this.repository.create({
+      clientId,
+      serviceId: dto.serviceId,
+      description: dto.description,
+      address: dto.address,
+      lat: dto.lat,
+      lng: dto.lng,
+      price: dto.price || service.basePrice,
+      paymentMethod: dto.paymentMethod || 'EFECTIVO',
+      scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
     });
 
     this.notifications.notifyAll('request:new', request);
@@ -91,18 +81,11 @@ export class ServiceRequestsService {
       }
     }
 
-    return this.prisma.serviceRequest.findMany({
-      where,
-      include: REQUEST_INCLUDE,
-      orderBy: { createdAt: 'desc' },
-    });
+    return this.repository.findMany({ where });
   }
 
   async findOne(id: string) {
-    const request = await this.prisma.serviceRequest.findUnique({
-      where: { id },
-      include: REQUEST_INCLUDE,
-    });
+    const request = await this.repository.findOne(id);
 
     if (!request) {
       throw new NotFoundException('Solicitud no encontrada');
@@ -120,7 +103,7 @@ export class ServiceRequestsService {
       throw new ForbiddenException('Solo proveedores pueden aceptar solicitudes');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.repository.transaction(async (tx) => {
       const activeRequest = await tx.serviceRequest.findFirst({
         where: {
           providerId: provider.id,
@@ -168,10 +151,7 @@ export class ServiceRequestsService {
   }
 
   async updateStatus(requestId: string, userId: string, dto: UpdateStatusDto) {
-    const request = await this.prisma.serviceRequest.findUnique({
-      where: { id: requestId },
-      include: { provider: true },
-    });
+    const request = await this.repository.findOne(requestId);
 
     if (!request) {
       throw new NotFoundException('Solicitud no encontrada');
@@ -201,11 +181,7 @@ export class ServiceRequestsService {
       );
     }
 
-    const updated = await this.prisma.serviceRequest.update({
-      where: { id: requestId },
-      data: { status: dto.status as any },
-      include: REQUEST_INCLUDE,
-    });
+    const updated = await this.repository.update(requestId, { status: dto.status as any });
 
     if (dto.status === 'FINALIZADA' || dto.status === 'CANCELADA') {
       if (request.providerId) {
@@ -218,7 +194,7 @@ export class ServiceRequestsService {
 
     this.notifications.notifyUser(request.clientId, 'request:status_changed', updated);
     if (request.provider) {
-      this.notifications.notifyUser(request.provider.userId, 'request:status_changed', updated);
+      this.notifications.notifyUser(request.provider.user.id, 'request:status_changed', updated);
     }
     this.notifications.notifyAll('request:updated', updated);
 
@@ -241,21 +217,17 @@ export class ServiceRequestsService {
       }
     }
 
-    return this.prisma.serviceRequest.findMany({
-      where,
-      include: REQUEST_INCLUDE,
-      orderBy: { updatedAt: 'desc' },
-    });
+    return this.repository.findMany({ where, orderBy: { updatedAt: 'desc' } });
   }
 
   async getStats() {
     const [total, pending, accepted, inProcess, completed, cancelled] = await Promise.all([
-      this.prisma.serviceRequest.count(),
-      this.prisma.serviceRequest.count({ where: { status: 'PENDIENTE' } }),
-      this.prisma.serviceRequest.count({ where: { status: 'ACEPTADA' } }),
-      this.prisma.serviceRequest.count({ where: { status: 'EN_PROCESO' } }),
-      this.prisma.serviceRequest.count({ where: { status: 'FINALIZADA' } }),
-      this.prisma.serviceRequest.count({ where: { status: 'CANCELADA' } }),
+      this.repository.count(),
+      this.repository.count({ status: 'PENDIENTE' }),
+      this.repository.count({ status: 'ACEPTADA' }),
+      this.repository.count({ status: 'EN_PROCESO' }),
+      this.repository.count({ status: 'FINALIZADA' }),
+      this.repository.count({ status: 'CANCELADA' }),
     ]);
 
     return { total, pending, accepted, inProcess, completed, cancelled };

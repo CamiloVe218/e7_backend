@@ -14,6 +14,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ServiceRequestsController = void 0;
 const common_1 = require("@nestjs/common");
+const swagger_1 = require("@nestjs/swagger");
 const service_requests_service_1 = require("./service-requests.service");
 const create_request_dto_1 = require("./dto/create-request.dto");
 const update_status_dto_1 = require("./dto/update-status.dto");
@@ -53,6 +54,7 @@ let ServiceRequestsController = class ServiceRequestsController {
 };
 exports.ServiceRequestsController = ServiceRequestsController;
 __decorate([
+    (0, swagger_1.ApiOperation)({ summary: 'Crear una nueva solicitud de servicio (solo CLIENTE)' }),
     (0, common_1.Post)(),
     (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
     (0, roles_decorator_1.Roles)('CLIENTE'),
@@ -63,6 +65,8 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], ServiceRequestsController.prototype, "create", null);
 __decorate([
+    (0, swagger_1.ApiOperation)({ summary: 'Listar solicitudes (filtradas por rol del usuario)' }),
+    (0, swagger_1.ApiQuery)({ name: 'status', required: false, description: 'Filtrar por estado' }),
     (0, common_1.Get)(),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Query)('status')),
@@ -71,6 +75,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], ServiceRequestsController.prototype, "findAll", null);
 __decorate([
+    (0, swagger_1.ApiOperation)({ summary: 'Historial de solicitudes finalizadas o canceladas' }),
     (0, common_1.Get)('history'),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -78,6 +83,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], ServiceRequestsController.prototype, "getHistory", null);
 __decorate([
+    (0, swagger_1.ApiOperation)({ summary: 'Estadísticas de solicitudes (solo ADMIN)' }),
     (0, common_1.Get)('stats'),
     (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
     (0, roles_decorator_1.Roles)('ADMIN'),
@@ -86,6 +92,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], ServiceRequestsController.prototype, "getStats", null);
 __decorate([
+    (0, swagger_1.ApiOperation)({ summary: 'Obtener una solicitud por ID' }),
     (0, common_1.Get)(':id'),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
@@ -93,6 +100,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], ServiceRequestsController.prototype, "findOne", null);
 __decorate([
+    (0, swagger_1.ApiOperation)({ summary: 'Aceptar una solicitud (solo PROVEEDOR)' }),
     (0, common_1.Patch)(':id/accept'),
     (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
     (0, roles_decorator_1.Roles)('PROVEEDOR'),
@@ -103,6 +111,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], ServiceRequestsController.prototype, "acceptRequest", null);
 __decorate([
+    (0, swagger_1.ApiOperation)({ summary: 'Cambiar el estado de una solicitud' }),
     (0, common_1.Patch)(':id/status'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
@@ -112,6 +121,8 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], ServiceRequestsController.prototype, "updateStatus", null);
 exports.ServiceRequestsController = ServiceRequestsController = __decorate([
+    (0, swagger_1.ApiTags)('service-requests'),
+    (0, swagger_1.ApiBearerAuth)(),
     (0, common_1.Controller)('service-requests'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     __metadata("design:paramtypes", [service_requests_service_1.ServiceRequestsService])

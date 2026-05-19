@@ -6,22 +6,29 @@ import { ServiceRequest, User } from '@/types';
 import { StatusBadge } from '@/components/ui/Badge';
 import { formatCurrency, formatDateShort } from '@/lib/utils';
 
-function SectionLabel({ children, count }: { children: React.ReactNode; count?: number }) {
+const ROLE_LABEL: Record<string, string> = {
+  CLIENTE:   'Cliente',
+  PROVEEDOR: 'Proveedor',
+  ADMIN:     'Admin',
+};
+
+function StatCard({ label, value, accent }: { label: string; value: number; accent?: string }) {
   return (
-    <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
-      <p className="text-sm font-semibold text-white">{children}</p>
-      {count !== undefined && (
-        <span className="text-xs text-gray-600 tabular-nums">{count}</span>
-      )}
+    <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-card">
+      <p className="text-[10px] font-bold tracking-[0.1em] uppercase text-gray-400 mb-2">{label}</p>
+      <p className={`text-3xl font-bold tabular-nums font-tight ${accent || 'text-gray-900'}`}>{value}</p>
     </div>
   );
 }
 
-const ROLE_LABEL: Record<string, string> = {
-  CLIENTE: 'Cliente',
-  PROVEEDOR: 'Proveedor',
-  ADMIN: 'Admin',
-};
+function PanelHeader({ title, count }: { title: string; count: number }) {
+  return (
+    <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+      <p className="text-sm font-semibold text-gray-900">{title}</p>
+      <span className="text-xs text-gray-400 tabular-nums">{count}</span>
+    </div>
+  );
+}
 
 export default function AdminDashboard() {
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
@@ -45,10 +52,15 @@ export default function AdminDashboard() {
   if (loading) {
     return (
       <div className="max-w-6xl mx-auto space-y-6">
-        <div className="h-8 w-48 bg-gray-900 rounded-lg animate-pulse" />
+        <div className="h-8 w-64 bg-gray-200 rounded-lg animate-pulse" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="h-24 rounded-xl bg-gray-200 animate-pulse" />
+          ))}
+        </div>
         <div className="grid lg:grid-cols-2 gap-5">
           {[1, 2].map(i => (
-            <div key={i} className="h-80 rounded-xl bg-gray-900 border border-gray-800 animate-pulse" />
+            <div key={i} className="h-80 rounded-xl bg-gray-200 animate-pulse" />
           ))}
         </div>
       </div>
@@ -62,70 +74,66 @@ export default function AdminDashboard() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
+
+      {/* Header */}
       <div>
-        <h1 className="text-xl font-bold text-white tracking-tight">Panel de administración</h1>
-        <p className="text-sm text-gray-500 mt-1">Visión general del sistema</p>
+        <h1 className="font-tight text-2xl font-bold text-gray-900 tracking-tight">Panel de administración</h1>
+        <p className="text-sm text-gray-400 mt-1">Visión general del sistema</p>
       </div>
 
+      {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: 'Total', value: requests.length, color: 'text-white' },
-          { label: 'Pendientes', value: statusCounts['PENDIENTE'] || 0, color: 'text-amber-400' },
-          { label: 'En proceso', value: (statusCounts['ACEPTADA'] || 0) + (statusCounts['EN_PROCESO'] || 0), color: 'text-blue-400' },
-          { label: 'Finalizadas', value: statusCounts['FINALIZADA'] || 0, color: 'text-emerald-400' },
-        ].map(stat => (
-          <div key={stat.label} className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-            <p className="text-[11px] font-semibold tracking-[0.08em] uppercase text-gray-600 mb-1.5">
-              {stat.label}
-            </p>
-            <p className={`text-2xl font-bold tabular-nums ${stat.color}`}>{stat.value}</p>
-          </div>
-        ))}
+        <StatCard label="Total"       value={requests.length} />
+        <StatCard label="Pendientes"  value={statusCounts['PENDIENTE'] || 0}  accent="text-amber-600" />
+        <StatCard label="En proceso"  value={(statusCounts['ACEPTADA'] || 0) + (statusCounts['EN_PROCESO'] || 0)} accent="text-blue-600" />
+        <StatCard label="Finalizadas" value={statusCounts['FINALIZADA'] || 0} accent="text-emerald-600" />
       </div>
 
+      {/* Two panels */}
       <div className="grid lg:grid-cols-2 gap-5">
-        <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
-          <SectionLabel count={requests.length}>Solicitudes recientes</SectionLabel>
-          <div className="divide-y divide-gray-800">
+
+        {/* Requests */}
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-card">
+          <PanelHeader title="Solicitudes recientes" count={requests.length} />
+          <div className="divide-y divide-gray-100">
             {requests.slice(0, 12).map(req => (
               <div key={req.id} className="flex items-center gap-3 px-5 py-3">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <p className="text-sm font-medium text-white truncate">{req.service?.name}</p>
-                  </div>
-                  <p className="text-xs text-gray-600 truncate">
+                  <p className="text-sm font-medium text-gray-900 truncate">{req.service?.name}</p>
+                  <p className="text-xs text-gray-400 truncate mt-0.5">
                     {req.client?.name} · {formatDateShort(req.createdAt)}
                   </p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   {req.price && (
-                    <span className="text-xs text-gray-500 tabular-nums">{formatCurrency(req.price)}</span>
+                    <span className="text-xs font-semibold text-gray-600 tabular-nums">{formatCurrency(req.price)}</span>
                   )}
                   <StatusBadge status={req.status} />
                 </div>
               </div>
             ))}
             {requests.length === 0 && (
-              <div className="px-5 py-10 text-center text-sm text-gray-600">
+              <div className="px-5 py-12 text-center text-sm text-gray-400">
                 No hay solicitudes registradas
               </div>
             )}
           </div>
         </div>
 
-        <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
-          <SectionLabel count={users.length}>Usuarios registrados</SectionLabel>
-          <div className="divide-y divide-gray-800">
+        {/* Users */}
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-card">
+          <PanelHeader title="Usuarios registrados" count={users.length} />
+          <div className="divide-y divide-gray-100">
             {users.slice(0, 12).map(u => (
               <div key={u.id} className="flex items-center gap-3 px-5 py-3">
-                <div className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-xs font-semibold text-gray-400 shrink-0">
+                <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-600 shrink-0 select-none">
                   {u.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white truncate">{u.name}</p>
-                  <p className="text-xs text-gray-600 truncate">{u.email}</p>
+                  <p className="text-sm font-medium text-gray-900 truncate">{u.name}</p>
+                  <p className="text-xs text-gray-400 truncate">{u.email}</p>
                 </div>
-                <span className="text-[11px] font-medium text-gray-500 shrink-0">
+                <span className="text-xs font-medium text-gray-400 shrink-0">
                   {ROLE_LABEL[u.role] || u.role}
                 </span>
               </div>

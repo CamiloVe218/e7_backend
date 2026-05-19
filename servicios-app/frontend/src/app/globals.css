@@ -1,59 +1,77 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  * {
+  *, *::before, *::after {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
   }
 
-  :root {
-    color-scheme: dark;
-  }
-
   html {
     scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
-    background-color: #0a0a0a;
-    color: #ffffff;
+    background-color: #F7F7F5;
+    color: #111111;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'cv11', 'ss01';
+    font-variation-settings: 'opsz' 32;
   }
 
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
   }
-
   ::-webkit-scrollbar-track {
-    background: #111111;
+    background: #F7F7F5;
   }
-
   ::-webkit-scrollbar-thumb {
-    background: #333333;
-    border-radius: 3px;
+    background: #D9D9D9;
+    border-radius: 99px;
   }
-
   ::-webkit-scrollbar-thumb:hover {
-    background: #555555;
+    background: #9A9A9A;
   }
 
-  input[type='datetime-local']::-webkit-calendar-picker-indicator {
-    filter: invert(1);
-    opacity: 0.5;
+  ::selection {
+    background-color: #111111;
+    color: #ffffff;
   }
 }
 
 @layer utilities {
+  .font-tight {
+    font-family: 'Inter Tight', 'Inter', system-ui, sans-serif;
+  }
+
   .line-clamp-2 {
     overflow: hidden;
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+  }
+
+  .line-clamp-3 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Premium micro-interaction: smooth focus rings */
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1;
   }
 }

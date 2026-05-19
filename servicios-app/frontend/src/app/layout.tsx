@@ -7,14 +7,10 @@ export const metadata: Metadata = {
   description: 'Plataforma de gestión de servicios',
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className="dark">
-      <body className="bg-gray-950 text-white antialiased">
+    <html lang="es">
+      <body className="bg-gray-100 text-gray-900 antialiased">
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

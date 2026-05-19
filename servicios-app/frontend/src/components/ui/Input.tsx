@@ -3,15 +3,15 @@
 import { InputHTMLAttributes, TextareaHTMLAttributes, SelectHTMLAttributes, forwardRef } from 'react';
 import { cn } from '@/lib/utils';
 
-const fieldBase = 'flex flex-col gap-1.5';
-const labelBase = 'text-xs font-medium text-gray-400 tracking-wide';
-const inputBase = [
-  'w-full px-3 py-2.5 text-sm rounded-lg border bg-gray-900 text-white',
-  'placeholder:text-gray-600 transition-colors duration-150',
-  'focus:outline-none focus:border-blue-500 focus:bg-gray-850',
+const fieldBase   = 'flex flex-col gap-1.5';
+const labelBase   = 'text-xs font-semibold text-gray-500 uppercase tracking-wide';
+const inputBase   = [
+  'w-full px-3.5 py-2.5 text-sm rounded-xl border bg-white text-gray-900',
+  'placeholder:text-gray-400 transition-colors duration-150',
+  'focus:outline-none',
 ].join(' ');
-const errorBorder = 'border-red-800 focus:border-red-700';
-const defaultBorder = 'border-gray-800 hover:border-gray-700';
+const defaultBorder = 'border-gray-200 hover:border-gray-300 focus:border-gray-900';
+const errorBorder   = 'border-red-300 focus:border-red-500';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -35,8 +35,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           className={cn(inputBase, error ? errorBorder : defaultBorder, className)}
           {...props}
         />
-        {error && <p className="text-xs text-red-400">{error}</p>}
-        {helperText && !error && <p className="text-xs text-gray-600">{helperText}</p>}
+        {error && <p className="text-xs text-red-600 mt-0.5">{error}</p>}
+        {helperText && !error && <p className="text-xs text-gray-400 mt-0.5">{helperText}</p>}
       </div>
     );
   },
@@ -64,7 +64,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           className={cn(inputBase, 'resize-none', error ? errorBorder : defaultBorder, className)}
           {...props}
         />
-        {error && <p className="text-xs text-red-400">{error}</p>}
+        {error && <p className="text-xs text-red-600 mt-0.5">{error}</p>}
       </div>
     );
   },
@@ -94,12 +94,12 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           {...props}
         >
           {options.map((opt) => (
-            <option key={opt.value} value={opt.value} className="bg-gray-900">
+            <option key={opt.value} value={opt.value}>
               {opt.label}
             </option>
           ))}
         </select>
-        {error && <p className="text-xs text-red-400">{error}</p>}
+        {error && <p className="text-xs text-red-600 mt-0.5">{error}</p>}
       </div>
     );
   },

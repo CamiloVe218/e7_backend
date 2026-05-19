@@ -9,16 +9,25 @@ import { useSocketEvents } from '@/hooks/useSocket';
 import { getCatalogForService, SERVICE_LABELS } from '@/lib/catalog';
 import { formatCurrency } from '@/lib/utils';
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+function Overline({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[11px] font-semibold tracking-[0.08em] uppercase text-gray-600 mb-3">
+    <p className="text-[10px] font-bold tracking-[0.1em] uppercase text-gray-400 mb-4">
       {children}
     </p>
   );
 }
 
-function SkeletonCard({ h = 'h-36' }: { h?: string }) {
-  return <div className={`${h} rounded-xl bg-gray-900 border border-gray-800 animate-pulse`} />;
+function Skeleton({ className = 'h-36' }: { className?: string }) {
+  return <div className={`${className} rounded-xl bg-gray-200 animate-pulse`} />;
+}
+
+function EmptyState({ icon, message }: { icon: React.ReactNode; message: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 rounded-xl border border-dashed border-gray-200 bg-white">
+      <div className="text-gray-300 mb-3">{icon}</div>
+      <p className="text-sm text-gray-400">{message}</p>
+    </div>
+  );
 }
 
 export default function ClientDashboard() {
@@ -50,7 +59,7 @@ export default function ClientDashboard() {
   };
 
   useSocketEvents({
-    'request:accepted': () => { showToast('Solicitud registrada. En espera de que un trabajador acepte el servicio.'); fetchData(); },
+    'request:accepted':      () => { showToast('En espera de que un trabajador acepte el servicio.'); fetchData(); },
     'request:status_changed': () => fetchData(),
   });
 
@@ -76,41 +85,47 @@ export default function ClientDashboard() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-10">
+
+      {/* Toast */}
       {toast && (
-        <div className="fixed top-4 right-4 z-40 max-w-sm px-4 py-3 rounded-xl bg-gray-900 border border-gray-700 shadow-2xl shadow-black/60">
-          <p className="text-sm text-gray-300 leading-snug">{toast}</p>
+        <div className="fixed top-4 right-4 z-40 max-w-sm px-4 py-3 rounded-xl bg-white border border-gray-200 shadow-dropdown">
+          <p className="text-sm text-gray-700 leading-snug">{toast}</p>
         </div>
       )}
 
+      {/* Page header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-bold text-white tracking-tight">Menú principal</h1>
-          <p className="text-sm text-gray-500 mt-1">Gestiona tus solicitudes de servicio</p>
+          <h1 className="font-tight text-2xl font-bold text-gray-900 tracking-tight">Menú principal</h1>
+          <p className="text-sm text-gray-400 mt-1">Gestiona tus solicitudes de servicio</p>
         </div>
         <button
           onClick={() => openDrawer()}
-          className="flex items-center gap-2 h-9 px-4 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors"
+          className="flex items-center gap-2 h-9 px-4 text-sm font-semibold rounded-xl bg-gray-900 hover:bg-gray-800 text-white transition-colors"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
           </svg>
           Nueva solicitud
         </button>
       </div>
 
+      {/* Active requests */}
       <div>
-        <SectionLabel>Solicitudes activas</SectionLabel>
+        <Overline>Solicitudes activas</Overline>
         {loading ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
+            {[1, 2, 3].map(i => <Skeleton key={i} />)}
           </div>
         ) : active.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 rounded-xl border border-gray-800 border-dashed">
-            <svg className="w-8 h-8 text-gray-700 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <p className="text-sm text-gray-600">Sin solicitudes activas</p>
-          </div>
+          <EmptyState
+            icon={
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            }
+            message="Sin solicitudes activas"
+          />
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {active.map(req => (
@@ -126,11 +141,12 @@ export default function ClientDashboard() {
         )}
       </div>
 
+      {/* Services catalog */}
       <div>
-        <SectionLabel>Servicios disponibles</SectionLabel>
+        <Overline>Servicios disponibles</Overline>
         {loading ? (
           <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
-            {[1, 2, 3, 4].map(i => <SkeletonCard key={i} h="h-20" />)}
+            {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-20" />)}
           </div>
         ) : (
           <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
@@ -144,13 +160,13 @@ export default function ClientDashboard() {
                 <button
                   key={service.id}
                   onClick={() => openDrawer(service.id)}
-                  className="group text-left bg-gray-900 border border-gray-800 hover:border-gray-700 rounded-xl p-4 transition-colors duration-150"
+                  className="group text-left bg-white border border-gray-200 hover:border-gray-900 hover:shadow-sm rounded-xl p-4 transition-all duration-150"
                 >
-                  <p className="text-sm font-semibold text-white mb-1 group-hover:text-blue-400 transition-colors">
+                  <p className="text-sm font-semibold text-gray-900 mb-1 leading-tight">
                     {label}
                   </p>
-                  <p className="text-xs text-gray-600">
-                    Desde <span className="text-gray-400 font-medium">{formatCurrency(minPrice)}</span>
+                  <p className="text-xs text-gray-400">
+                    Desde <span className="font-semibold text-gray-600">{formatCurrency(minPrice)}</span>
                   </p>
                 </button>
               );

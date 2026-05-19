@@ -8,6 +8,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { ServiceRequestsService } from './service-requests.service';
 import { CreateRequestDto } from './dto/create-request.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
@@ -16,11 +17,14 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
+@ApiTags('service-requests')
+@ApiBearerAuth()
 @Controller('service-requests')
 @UseGuards(JwtAuthGuard)
 export class ServiceRequestsController {
   constructor(private serviceRequestsService: ServiceRequestsService) {}
 
+  @ApiOperation({ summary: 'Crear una nueva solicitud de servicio (solo CLIENTE)' })
   @Post()
   @UseGuards(RolesGuard)
   @Roles('CLIENTE')
@@ -28,6 +32,8 @@ export class ServiceRequestsController {
     return this.serviceRequestsService.create(user.id, dto);
   }
 
+  @ApiOperation({ summary: 'Listar solicitudes (filtradas por rol del usuario)' })
+  @ApiQuery({ name: 'status', required: false, description: 'Filtrar por estado' })
   @Get()
   findAll(
     @CurrentUser() user: any,
@@ -40,11 +46,13 @@ export class ServiceRequestsController {
     });
   }
 
+  @ApiOperation({ summary: 'Historial de solicitudes finalizadas o canceladas' })
   @Get('history')
   getHistory(@CurrentUser() user: any) {
     return this.serviceRequestsService.getHistory(user.id, user.role);
   }
 
+  @ApiOperation({ summary: 'Estadísticas de solicitudes (solo ADMIN)' })
   @Get('stats')
   @UseGuards(RolesGuard)
   @Roles('ADMIN')
@@ -52,11 +60,13 @@ export class ServiceRequestsController {
     return this.serviceRequestsService.getStats();
   }
 
+  @ApiOperation({ summary: 'Obtener una solicitud por ID' })
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.serviceRequestsService.findOne(id);
   }
 
+  @ApiOperation({ summary: 'Aceptar una solicitud (solo PROVEEDOR)' })
   @Patch(':id/accept')
   @UseGuards(RolesGuard)
   @Roles('PROVEEDOR')
@@ -64,6 +74,7 @@ export class ServiceRequestsController {
     return this.serviceRequestsService.acceptRequest(id, user.id);
   }
 
+  @ApiOperation({ summary: 'Cambiar el estado de una solicitud' })
   @Patch(':id/status')
   updateStatus(
     @Param('id') id: string,

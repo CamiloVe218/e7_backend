@@ -10,6 +10,7 @@ exports.ServiceRequestsModule = void 0;
 const common_1 = require("@nestjs/common");
 const service_requests_service_1 = require("./service-requests.service");
 const service_requests_controller_1 = require("./service-requests.controller");
+const service_request_repository_1 = require("./repositories/service-request.repository");
 const notifications_module_1 = require("../notifications/notifications.module");
 let ServiceRequestsModule = class ServiceRequestsModule {
 };
@@ -18,7 +19,7 @@ exports.ServiceRequestsModule = ServiceRequestsModule = __decorate([
     (0, common_1.Module)({
         imports: [notifications_module_1.NotificationsModule],
         controllers: [service_requests_controller_1.ServiceRequestsController],
-        providers: [service_requests_service_1.ServiceRequestsService],
+        providers: [service_requests_service_1.ServiceRequestsService, service_request_repository_1.ServiceRequestRepository],
         exports: [service_requests_service_1.ServiceRequestsService],
     })
 ], ServiceRequestsModule);

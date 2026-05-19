@@ -11,6 +11,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RegisterDto = exports.Role = void 0;
 const class_validator_1 = require("class-validator");
+const swagger_1 = require("@nestjs/swagger");
 var Role;
 (function (Role) {
     Role["CLIENTE"] = "CLIENTE";
@@ -20,35 +21,42 @@ class RegisterDto {
 }
 exports.RegisterDto = RegisterDto;
 __decorate([
+    (0, swagger_1.ApiProperty)({ example: 'usuario@demo.com' }),
     (0, class_validator_1.IsEmail)({}, { message: 'Email inválido' }),
     __metadata("design:type", String)
 ], RegisterDto.prototype, "email", void 0);
 __decorate([
+    (0, swagger_1.ApiProperty)({ example: 'password123', minLength: 6 }),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.MinLength)(6, { message: 'La contraseña debe tener al menos 6 caracteres' }),
     __metadata("design:type", String)
 ], RegisterDto.prototype, "password", void 0);
 __decorate([
+    (0, swagger_1.ApiProperty)({ example: 'Juan Pérez', minLength: 2 }),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.MinLength)(2, { message: 'El nombre debe tener al menos 2 caracteres' }),
     __metadata("design:type", String)
 ], RegisterDto.prototype, "name", void 0);
 __decorate([
+    (0, swagger_1.ApiPropertyOptional)({ enum: Role, default: Role.CLIENTE }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsEnum)(Role, { message: 'Rol inválido' }),
     __metadata("design:type", String)
 ], RegisterDto.prototype, "role", void 0);
 __decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: '+52 1 234 567 8900' }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], RegisterDto.prototype, "phone", void 0);
 __decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: 'Plomero con 10 años de experiencia' }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], RegisterDto.prototype, "bio", void 0);
 __decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: ['PLOMERIA', 'ELECTRICIDAD'] }),
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Array)
 ], RegisterDto.prototype, "serviceType", void 0);

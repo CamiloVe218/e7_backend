@@ -28,34 +28,34 @@ export function formatDateShort(dateStr: string): string {
 
 export const STATUS_LABELS: Record<RequestStatus, string> = {
   PENDIENTE: 'Pendiente',
-  ACEPTADA: 'Aceptada',
+  ACEPTADA:  'Aceptada',
   EN_PROCESO: 'En proceso',
   FINALIZADA: 'Finalizada',
-  CANCELADA: 'Cancelada',
+  CANCELADA:  'Cancelada',
 };
 
 export const STATUS_DOT: Record<RequestStatus, string> = {
-  PENDIENTE: 'bg-amber-400',
-  ACEPTADA: 'bg-blue-400',
-  EN_PROCESO: 'bg-violet-400',
-  FINALIZADA: 'bg-emerald-400',
-  CANCELADA: 'bg-gray-500',
+  PENDIENTE:  'bg-amber-400',
+  ACEPTADA:   'bg-blue-500',
+  EN_PROCESO: 'bg-violet-500',
+  FINALIZADA: 'bg-emerald-500',
+  CANCELADA:  'bg-gray-300',
 };
 
 export const STATUS_TEXT: Record<RequestStatus, string> = {
-  PENDIENTE: 'text-amber-400',
-  ACEPTADA: 'text-blue-400',
-  EN_PROCESO: 'text-violet-400',
-  FINALIZADA: 'text-emerald-400',
-  CANCELADA: 'text-gray-500',
+  PENDIENTE:  'text-amber-700',
+  ACEPTADA:   'text-blue-700',
+  EN_PROCESO: 'text-violet-700',
+  FINALIZADA: 'text-emerald-700',
+  CANCELADA:  'text-gray-400',
 };
 
 export const STATUS_COLORS: Record<RequestStatus, string> = {
-  PENDIENTE: 'bg-amber-950/40 text-amber-400 border-amber-900/60',
-  ACEPTADA: 'bg-blue-950/40 text-blue-400 border-blue-900/60',
-  EN_PROCESO: 'bg-violet-950/40 text-violet-400 border-violet-900/60',
-  FINALIZADA: 'bg-emerald-950/40 text-emerald-400 border-emerald-900/60',
-  CANCELADA: 'bg-gray-800/40 text-gray-500 border-gray-700/60',
+  PENDIENTE:  'bg-amber-50 text-amber-700 border-amber-200',
+  ACEPTADA:   'bg-blue-50 text-blue-700 border-blue-200',
+  EN_PROCESO: 'bg-violet-50 text-violet-700 border-violet-200',
+  FINALIZADA: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  CANCELADA:  'bg-gray-100 text-gray-400 border-gray-200',
 };
 
 export function cn(...classes: (string | undefined | false | null)[]): string {

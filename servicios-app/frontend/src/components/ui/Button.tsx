@@ -10,11 +10,11 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variants = {
-  primary: 'bg-blue-600 hover:bg-blue-500 text-white border-transparent shadow-sm',
-  secondary: 'bg-gray-800 hover:bg-gray-750 text-gray-100 border-gray-700 hover:border-gray-600',
-  ghost: 'bg-transparent hover:bg-gray-800 text-gray-400 hover:text-white border-transparent',
-  danger: 'bg-transparent hover:bg-red-950/40 text-red-400 border-red-900/60 hover:border-red-800',
-  success: 'bg-transparent hover:bg-emerald-950/40 text-emerald-400 border-emerald-900/60 hover:border-emerald-800',
+  primary:   'bg-gray-900 hover:bg-gray-800 text-white border-transparent',
+  secondary: 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200 hover:border-gray-300',
+  ghost:     'bg-transparent hover:bg-gray-100 text-gray-500 hover:text-gray-900 border-transparent',
+  danger:    'bg-transparent hover:bg-red-50 text-red-600 border-transparent hover:border-red-200 hover:border',
+  success:   'bg-transparent hover:bg-emerald-50 text-emerald-700 border-transparent hover:border-emerald-200 hover:border',
 };
 
 const sizes = {
@@ -29,8 +29,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       ref={ref}
       disabled={disabled || loading}
       className={cn(
-        'inline-flex items-center justify-center font-medium rounded-lg border transition-all duration-150',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50',
+        'inline-flex items-center justify-center font-semibold rounded-xl border transition-all duration-150',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-1',
         'disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none',
         variants[variant],
         sizes[size],
