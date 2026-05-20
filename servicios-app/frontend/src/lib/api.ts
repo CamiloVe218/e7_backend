@@ -11,17 +11,22 @@ async function request<T>(
 ): Promise<T> {
   const token = getToken();
 
-  const res = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers || {}),
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.headers || {}),
+      },
+    });
+  } catch {
+    throw new Error('No se pudo conectar al servidor. Verifica tu conexión.');
+  }
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ message: 'Error de red' }));
+    const err = await res.json().catch(() => ({ message: 'Error en la respuesta del servidor' }));
     throw new Error(err.message || `Error ${res.status}`);
   }
 
