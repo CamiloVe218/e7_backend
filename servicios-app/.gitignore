@@ -10,6 +10,7 @@ coverage/
 .env
 .env.local
 .env.production
+!frontend/.env.production
 
 # logs
 npm-debug.log*
