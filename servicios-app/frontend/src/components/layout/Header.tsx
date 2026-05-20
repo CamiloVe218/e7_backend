@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { usersApi } from '@/lib/api';
+import { usersApi, authApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 const ROLE_LABEL: Record<string, string> = {
@@ -123,9 +123,116 @@ function ProfileModal({
   );
 }
 
+function PasswordConfirmModal({
+  user,
+  onVerified,
+  onClose,
+}: {
+  user: any;
+  onVerified: () => void;
+  onClose: () => void;
+}) {
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', fn);
+    return () => document.removeEventListener('keydown', fn);
+  }, [onClose]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!password) { setError('Ingresa tu contraseña'); return; }
+    setLoading(true);
+    setError('');
+    try {
+      await authApi.login(user.email, password);
+      onVerified();
+    } catch {
+      setError('Contraseña incorrecta. Intenta de nuevo.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={onClose} />
+      <div
+        className="relative w-full max-w-sm rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="px-7 pt-7 pb-5">
+          <div className="w-11 h-11 rounded-xl bg-gray-100 flex items-center justify-center mb-5">
+            <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <h3 className="font-tight text-lg font-bold text-gray-900 mb-1">Confirmar identidad</h3>
+          <p className="text-sm text-gray-500 leading-relaxed">
+            Por seguridad, ingresa tu contraseña para continuar.
+          </p>
+        </div>
+
+        <div className="h-px bg-gray-100" />
+
+        <form onSubmit={handleSubmit} className="px-7 py-5 space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Contraseña actual</label>
+            <input
+              type="password"
+              value={password}
+              onChange={e => { setPassword(e.target.value); setError(''); }}
+              placeholder="••••••••"
+              autoFocus
+              autoComplete="current-password"
+              className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 hover:border-gray-300 focus:outline-none focus:border-gray-900 transition-colors"
+            />
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-red-50 border border-red-100">
+              <svg className="w-3.5 h-3.5 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-xs text-red-600">{error}</p>
+            </div>
+          )}
+
+          <div className="flex gap-2.5 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 h-10 text-sm font-semibold rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading || !password}
+              className="flex-1 h-10 text-sm font-bold rounded-xl bg-gray-900 hover:bg-gray-800 text-white transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+            >
+              {loading && (
+                <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              )}
+              Continuar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export function Header() {
   const { user, logout, refreshUser } = useAuth();
   const [open, setOpen] = useState(false);
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -174,7 +281,7 @@ export function Header() {
               </div>
               <div className="py-1">
                 <button
-                  onClick={() => { setOpen(false); setShowProfile(true); }}
+                  onClick={() => { setOpen(false); setShowPasswordConfirm(true); }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors text-left"
                 >
                   <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -197,6 +304,14 @@ export function Header() {
           )}
         </div>
       </header>
+
+      {showPasswordConfirm && (
+        <PasswordConfirmModal
+          user={user}
+          onVerified={() => { setShowPasswordConfirm(false); setShowProfile(true); }}
+          onClose={() => setShowPasswordConfirm(false)}
+        />
+      )}
 
       {showProfile && (
         <ProfileModal

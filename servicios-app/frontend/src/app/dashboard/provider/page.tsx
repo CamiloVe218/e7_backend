@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { requestsApi } from '@/lib/api';
+import { requestsApi, providersApi } from '@/lib/api';
 import { ServiceRequest } from '@/types';
 import { RequestCard } from '@/components/requests/RequestCard';
 import { useSocketEvents } from '@/hooks/useSocket';
@@ -22,6 +22,8 @@ export default function ProviderDashboard() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
+  const [availLoading, setAvailLoading] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -35,6 +37,27 @@ export default function ProviderDashboard() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    providersApi.getMyProfile()
+      .then(p => setIsAvailable(p.isAvailable ?? true))
+      .catch(() => setIsAvailable(true));
+  }, []);
+
+  const toggleAvailability = async () => {
+    if (isAvailable === null || availLoading) return;
+    const next = !isAvailable;
+    setAvailLoading(true);
+    try {
+      await providersApi.updateProfile({ isAvailable: next });
+      setIsAvailable(next);
+      showToast(next ? 'Ahora estás disponible' : 'Ya no estás recibiendo solicitudes');
+    } catch (err: any) {
+      showToast(err.message || 'Error al actualizar disponibilidad');
+    } finally {
+      setAvailLoading(false);
+    }
+  };
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -85,9 +108,41 @@ export default function ProviderDashboard() {
       )}
 
       {/* Header */}
-      <div>
-        <h1 className="font-tight text-2xl font-bold text-gray-900 tracking-tight">Menú principal</h1>
-        <p className="text-sm text-gray-400 mt-1">Gestiona las solicitudes disponibles</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="font-tight text-2xl font-bold text-gray-900 tracking-tight">Menú principal</h1>
+          <p className="text-sm text-gray-400 mt-1">Gestiona las solicitudes disponibles</p>
+        </div>
+
+        {/* Availability toggle */}
+        <div className="flex items-center gap-4 px-5 py-3.5 bg-white rounded-xl border border-gray-200 shadow-sm shrink-0">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <div className="relative w-2 h-2 shrink-0">
+                <div className={`absolute inset-0 rounded-full ${isAvailable ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+                {isAvailable && (
+                  <div className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-60" />
+                )}
+              </div>
+              <p className={`text-sm font-bold ${isAvailable ? 'text-emerald-600' : 'text-gray-400'}`}>
+                {isAvailable === null ? '...' : isAvailable ? 'En línea' : 'No disponible'}
+              </p>
+            </div>
+            <p className="text-xs text-gray-400 mt-0.5 pl-4">
+              {isAvailable ? 'Recibiendo solicitudes' : 'Pausado'}
+            </p>
+          </div>
+          <button
+            onClick={toggleAvailability}
+            disabled={availLoading || isAvailable === null}
+            aria-label="Alternar disponibilidad"
+            className={`relative w-12 h-6 rounded-full transition-colors duration-300 disabled:opacity-50 shrink-0 focus:outline-none ${isAvailable ? 'bg-emerald-500' : 'bg-gray-300'}`}
+          >
+            <div
+              className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all duration-300 ${isAvailable ? 'left-[calc(100%-1.375rem)]' : 'left-0.5'}`}
+            />
+          </button>
+        </div>
       </div>
 
       {/* Active service */}
@@ -107,9 +162,19 @@ export default function ProviderDashboard() {
 
       {/* Available requests */}
       <div>
-        <Overline count={available.length}>Solicitudes disponibles</Overline>
+        <Overline count={isAvailable ? available.length : 0}>Solicitudes disponibles</Overline>
 
-        {loading ? (
+        {isAvailable === false ? (
+          <div className="flex flex-col items-center justify-center py-20 rounded-xl border border-dashed border-gray-200 bg-white">
+            <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center mb-4">
+              <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+              </svg>
+            </div>
+            <p className="text-sm font-semibold text-gray-500 mb-1">No estás disponible</p>
+            <p className="text-xs text-gray-400">Activa tu disponibilidad para recibir solicitudes</p>
+          </div>
+        ) : loading ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {[1, 2, 3].map(i => (
               <div key={i} className="h-36 rounded-xl bg-gray-200 animate-pulse" />

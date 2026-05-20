@@ -46,7 +46,7 @@ export class NotificationsGateway
     client.emit('registered', { success: true, userId: data.userId });
     console.log(`Usuario ${data.userId} registrado con socket ${client.id}`);
   }
-
+/**Salida de notificaciones   */
   notifyUser(userId: string, event: string, data: any) {
     const socketId = this.userSockets.get(userId);
     if (socketId) {

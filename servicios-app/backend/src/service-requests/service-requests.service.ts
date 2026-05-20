@@ -167,7 +167,7 @@ export class ServiceRequestsService {
     if (!isClient && !isProvider) {
       throw new ForbiddenException('No tienes permisos para modificar esta solicitud');
     }
-
+/**state */
     const validTransitions: Record<string, string[]> = {
       ACEPTADA: ['EN_PROCESO', 'CANCELADA'],
       EN_PROCESO: ['FINALIZADA', 'CANCELADA'],

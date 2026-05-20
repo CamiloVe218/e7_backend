@@ -32,3 +32,4 @@ export function useSocketEvents(
     };
   }, [events]);
 }
+/**Imprime los eventos  */

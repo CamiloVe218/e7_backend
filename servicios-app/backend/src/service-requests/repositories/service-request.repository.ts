@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Prisma, RequestStatus } from '@prisma/client';
 
-/** Includes shared across all ServiceRequest queries */
+/** Separacion de prisma uwu */
 export const REQUEST_INCLUDE = {
   service: true,
   client: { select: { id: true, name: true, email: true, phone: true } },
@@ -14,7 +14,7 @@ export const REQUEST_INCLUDE = {
   payment: true,
   rating: true,
 } satisfies Prisma.ServiceRequestInclude;
-
+/**repository partner */
 @Injectable()
 export class ServiceRequestRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -54,7 +54,6 @@ export class ServiceRequestRepository {
     return this.prisma.serviceRequest.count({ where });
   }
 
-  /** Executes multiple operations atomically */
   transaction<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
     return this.prisma.$transaction(fn);
   }
