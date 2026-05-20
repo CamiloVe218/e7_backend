@@ -1,0 +1,31 @@
+# dependencias
+node_modules/
+
+# compilación
+dist/
+coverage/
+
+# caché TypeScript
+*.tsbuildinfo
+
+# prisma compilado (seed)
+prisma/*.js
+prisma/*.js.map
+prisma/*.d.ts
+
+# entorno
+.env
+.env.local
+.env.production
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# carpetas temporales del proyecto
+Clonación
+Comprobación
+Documentos
+Ejecutando
