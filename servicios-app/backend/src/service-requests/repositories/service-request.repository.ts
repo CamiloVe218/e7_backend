@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Prisma, RequestStatus } from '@prisma/client';
 
-/** Separacion de prisma uwu */
 export const REQUEST_INCLUDE = {
   service: true,
   client: { select: { id: true, name: true, email: true, phone: true } },
@@ -14,7 +13,6 @@ export const REQUEST_INCLUDE = {
   payment: true,
   rating: true,
 } satisfies Prisma.ServiceRequestInclude;
-/**repository partner */
 @Injectable()
 export class ServiceRequestRepository {
   constructor(private readonly prisma: PrismaService) {}

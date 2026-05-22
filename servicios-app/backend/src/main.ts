@@ -31,6 +31,12 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
+  // Lightweight health check used by Docker and Railway
+  const httpAdapter = app.getHttpAdapter();
+  httpAdapter.get('/api/health', (_req: any, res: any) => {
+    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Servicios App API')
     .setDescription('Marketplace de servicios a domicilio — API REST')
