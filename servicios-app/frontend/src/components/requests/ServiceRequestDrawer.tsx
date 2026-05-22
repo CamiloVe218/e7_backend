@@ -266,6 +266,8 @@ export function ServiceRequestDrawer({ isOpen, onClose, onSuccess, services, pre
   const [card, setCard] = useState<CardForm>(CARD_INIT);
   const [cardErrors, setCardErrors] = useState<Record<keyof CardForm, string>>({ number: '', name: '', cvv: '', expiry: '' });
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
+  // Oaxaca as fallback; updated with real coords when available
+  const [coords, setCoords] = useState({ lat: 17.0669, lng: -96.7203 });
 
   const storedAddress = typeof window !== 'undefined'
     ? localStorage.getItem(ADDRESS_KEY) || 'Domicilio registrado'
@@ -286,7 +288,22 @@ export function ServiceRequestDrawer({ isOpen, onClose, onSuccess, services, pre
   }, [preselectedServiceId, services]);
 
   useEffect(() => {
-    if (isOpen) { reset(); setError(''); setPhase('form'); setCard(CARD_INIT); setCardErrors({ number: '', name: '', cvv: '', expiry: '' }); setShowPaymentOptions(false); }
+    if (isOpen) {
+      reset();
+      setError('');
+      setPhase('form');
+      setCard(CARD_INIT);
+      setCardErrors({ number: '', name: '', cvv: '', expiry: '' });
+      setShowPaymentOptions(false);
+      // Request real location; keep Oaxaca fallback on denial or timeout
+      if (typeof navigator !== 'undefined' && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          () => { /* keep default Oaxaca coords */ },
+          { timeout: 5000, maximumAge: 60_000 },
+        );
+      }
+    }
   }, [isOpen, reset]);
 
   const catalog    = sel.serviceKey ? CATALOG[sel.serviceKey] || null : null;
@@ -358,8 +375,8 @@ export function ServiceRequestDrawer({ isOpen, onClose, onSuccess, services, pre
         serviceId: sel.serviceId,
         description: autoDesc,
         address: storedAddress,
-        lat: 19.4326,
-        lng: -99.1332,
+        lat: coords.lat,
+        lng: coords.lng,
         price: subtotal || undefined,
         paymentMethod: sel.paymentMethod,
       });
@@ -385,8 +402,8 @@ export function ServiceRequestDrawer({ isOpen, onClose, onSuccess, services, pre
         serviceId: sel.serviceId,
         description: autoDesc,
         address: storedAddress,
-        lat: 19.4326,
-        lng: -99.1332,
+        lat: coords.lat,
+        lng: coords.lng,
         price: subtotal || undefined,
         paymentMethod: sel.paymentMethod,
       });

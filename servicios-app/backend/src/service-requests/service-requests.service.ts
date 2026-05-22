@@ -52,6 +52,8 @@ export class ServiceRequestsService {
     providerId?: string;
     role?: string;
     userId?: string;
+    limit?: number;
+    page?: number;
   }) {
     const where: any = {};
 
@@ -81,7 +83,10 @@ export class ServiceRequestsService {
       }
     }
 
-    return this.repository.findMany({ where });
+    const take = filters.limit;
+    const skip = filters.limit && filters.page ? (filters.page - 1) * filters.limit : undefined;
+
+    return this.repository.findMany({ where, take, skip });
   }
 
   async findOne(id: string) {

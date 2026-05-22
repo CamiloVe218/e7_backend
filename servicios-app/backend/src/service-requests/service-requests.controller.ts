@@ -34,15 +34,21 @@ export class ServiceRequestsController {
 
   @ApiOperation({ summary: 'Listar solicitudes (filtradas por rol del usuario)' })
   @ApiQuery({ name: 'status', required: false, description: 'Filtrar por estado' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Máximo de resultados' })
+  @ApiQuery({ name: 'page', required: false, description: 'Página (requiere limit)' })
   @Get()
   findAll(
     @CurrentUser() user: any,
     @Query('status') status?: string,
+    @Query('limit') limit?: string,
+    @Query('page') page?: string,
   ) {
     return this.serviceRequestsService.findAll({
       status,
       role: user.role,
       userId: user.id,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      page: page ? parseInt(page, 10) : undefined,
     });
   }
 

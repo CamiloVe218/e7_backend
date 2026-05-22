@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { GlobalExceptionFilter } from './filters/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -20,6 +21,8 @@ async function bootstrap() {
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
+
+  app.useGlobalFilters(new GlobalExceptionFilter());
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -48,7 +51,7 @@ async function bootstrap() {
 
   const port = parseInt(process.env.PORT as string, 10) || 4000;
   await app.listen(port, '0.0.0.0');
-  console.log(`🚀 Backend corriendo en http://0.0.0.0:${port}/api`);
-  console.log(`📖 Swagger disponible en http://0.0.0.0:${port}/api/docs`);
+  console.log(`Backend corriendo en http://0.0.0.0:${port}/api`);
+  console.log(`Swagger disponible en http://0.0.0.0:${port}/api/docs`);
 }
 bootstrap();

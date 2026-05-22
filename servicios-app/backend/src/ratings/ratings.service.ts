@@ -47,16 +47,14 @@ export class RatingsService {
       },
     });
 
-    const allRatings = await this.prisma.rating.findMany({
+    const { _avg } = await this.prisma.rating.aggregate({
       where: { providerId: request.providerId },
-      select: { score: true },
+      _avg: { score: true },
     });
-    const avgRating =
-      allRatings.reduce((sum, r) => sum + r.score, 0) / allRatings.length;
 
     await this.prisma.provider.update({
       where: { id: request.providerId },
-      data: { rating: Math.round(avgRating * 10) / 10 },
+      data: { rating: Math.round((_avg.score ?? 0) * 10) / 10 },
     });
 
     return rating;

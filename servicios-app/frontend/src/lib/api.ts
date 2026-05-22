@@ -5,6 +5,43 @@ function getToken(): string | null {
   return localStorage.getItem('token');
 }
 
+// ── Typed API error ──────────────────────────────────────────────────────────
+
+export class ApiError extends Error {
+  constructor(
+    public readonly statusCode: number,
+    public readonly code: string,
+    message: string,
+    public readonly details?: string[],
+    public readonly suggestion?: string,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+
+  get isNetworkError() { return this.statusCode === 0; }
+  get isUnauthorized() { return this.statusCode === 401; }
+  get isForbidden()    { return this.statusCode === 403; }
+  get isNotFound()     { return this.statusCode === 404; }
+  get isConflict()     { return this.statusCode === 409; }
+  get isRateLimit()    { return this.statusCode === 429; }
+  get isServerError()  { return this.statusCode >= 500; }
+}
+
+const HTTP_MESSAGES: Record<number, string> = {
+  400: 'Datos incorrectos. Revisa los campos del formulario.',
+  401: 'Tu sesión expiró. Inicia sesión nuevamente.',
+  403: 'No tienes permisos para realizar esta acción.',
+  404: 'El recurso solicitado no fue encontrado.',
+  409: 'Ya existe un registro con esos datos.',
+  422: 'Los datos enviados no son válidos.',
+  429: 'Demasiados intentos. Espera un minuto e intenta de nuevo.',
+  500: 'Estamos teniendo problemas internos. Intenta más tarde.',
+  503: 'Servicio no disponible temporalmente.',
+};
+
+// ── Core fetch wrapper ───────────────────────────────────────────────────────
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
@@ -18,20 +55,39 @@ async function request<T>(
       headers: {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(options.headers || {}),
+        ...(options.headers ?? {}),
       },
     });
   } catch {
-    throw new Error('No se pudo conectar al servidor. Verifica tu conexión.');
+    throw new ApiError(
+      0,
+      'NETWORK_ERROR',
+      'Sin conexión a internet. Verifica tu red e intenta de nuevo.',
+    );
   }
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ message: 'Error en la respuesta del servidor' }));
-    throw new Error(err.message || `Error ${res.status}`);
+    let body: Record<string, any> = {};
+    try { body = await res.json(); } catch { /* non-JSON error body */ }
+
+    const message =
+      body?.message ??
+      HTTP_MESSAGES[res.status] ??
+      `Error ${res.status}`;
+
+    throw new ApiError(
+      res.status,
+      body?.code ?? 'UNKNOWN_ERROR',
+      message,
+      body?.details,
+      body?.suggestion,
+    );
   }
 
-  return res.json();
+  return res.json() as Promise<T>;
 }
+
+// ── API modules ──────────────────────────────────────────────────────────────
 
 export const authApi = {
   login: (email: string, password: string) =>
@@ -49,7 +105,7 @@ export const authApi = {
 
 export const servicesApi = {
   getAll: (category?: string) =>
-    request<any[]>(`/services${category ? `?category=${category}` : ''}`),
+    request<any[]>(`/services${category ? `?category=${encodeURIComponent(category)}` : ''}`),
   getById: (id: string) => request<any>(`/services/${id}`),
   getCategories: () => request<string[]>('/services/categories'),
 };
@@ -61,7 +117,7 @@ export const requestsApi = {
       body: JSON.stringify(data),
     }),
   getAll: (status?: string) =>
-    request<any[]>(`/service-requests${status ? `?status=${status}` : ''}`),
+    request<any[]>(`/service-requests${status ? `?status=${encodeURIComponent(status)}` : ''}`),
   getById: (id: string) => request<any>(`/service-requests/${id}`),
   accept: (id: string) =>
     request<any>(`/service-requests/${id}/accept`, { method: 'PATCH' }),

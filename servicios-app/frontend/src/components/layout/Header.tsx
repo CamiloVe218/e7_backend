@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSidebar } from '@/contexts/SidebarContext';
 import { usersApi, authApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -231,6 +232,7 @@ function PasswordConfirmModal({
 
 export function Header() {
   const { user, logout, refreshUser } = useAuth();
+  const { toggle: toggleSidebar } = useSidebar();
   const [open, setOpen] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
@@ -246,7 +248,18 @@ export function Header() {
 
   return (
     <>
-      <header className="h-14 shrink-0 flex items-center px-6 border-b border-gray-200 bg-white">
+      <header className="h-14 shrink-0 flex items-center px-4 lg:px-6 border-b border-gray-200 bg-white gap-2">
+        {/* Hamburger — mobile only */}
+        <button
+          onClick={toggleSidebar}
+          className="lg:hidden flex items-center justify-center w-9 h-9 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors shrink-0"
+          aria-label="Abrir menú de navegación"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+
         <div className="flex-1" />
 
         <div className="relative" ref={ref}>

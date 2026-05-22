@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSidebar } from '@/contexts/SidebarContext';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -82,15 +83,11 @@ function HelpModal({ onClose }: { onClose: () => void }) {
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       onClick={onClose}
     >
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
-
-      {/* Panel */}
       <div
         className="relative bg-white rounded-2xl border border-gray-200 shadow-2xl w-full max-w-sm overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="px-7 pt-7 pb-5">
           <button
             onClick={onClose}
@@ -100,7 +97,6 @@ function HelpModal({ onClose }: { onClose: () => void }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
-
           <div className="w-11 h-11 rounded-xl bg-gray-100 flex items-center justify-center mb-5">
             <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -112,9 +108,7 @@ function HelpModal({ onClose }: { onClose: () => void }) {
 
         <div className="h-px bg-gray-100 mx-7" />
 
-        {/* Contact items */}
         <div className="px-7 py-5 space-y-4">
-          {/* Phone */}
           <a
             href="tel:9512185032"
             className="flex items-center gap-4 p-3.5 rounded-xl border border-gray-100 bg-gray-50 hover:bg-gray-100 hover:border-gray-200 transition-all duration-150 group"
@@ -133,7 +127,6 @@ function HelpModal({ onClose }: { onClose: () => void }) {
             </svg>
           </a>
 
-          {/* Email */}
           <a
             href="mailto:chernandez10.20.30.40@gmail.com"
             className="flex items-center gap-4 p-3.5 rounded-xl border border-gray-100 bg-gray-50 hover:bg-gray-100 hover:border-gray-200 transition-all duration-150 group"
@@ -153,7 +146,6 @@ function HelpModal({ onClose }: { onClose: () => void }) {
           </a>
         </div>
 
-        {/* Footer */}
         <div className="px-7 pb-7">
           <button
             onClick={onClose}
@@ -170,15 +162,58 @@ function HelpModal({ onClose }: { onClose: () => void }) {
 export function Sidebar() {
   const { user } = useAuth();
   const pathname = usePathname();
+  const { open, close } = useSidebar();
   const [showHelp, setShowHelp] = useState(false);
 
-  const filtered = navItems.filter((item) => user && item.roles.includes(user.role));
+  // Auto-close on navigation (mobile)
+  useEffect(() => {
+    close();
+  }, [pathname, close]);
+
+  // Close on Escape key
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [open, close]);
+
+  // Lock body scroll on mobile when open
+  useEffect(() => {
+    if (open && window.innerWidth < 1024) {
+      document.body.style.overflow = 'hidden';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [open]);
+
+  const filtered = navItems.filter(item => user && item.roles.includes(user.role));
 
   return (
     <>
-      <aside className="w-60 min-h-screen bg-white border-r border-gray-200 flex flex-col shrink-0">
+      {/* Overlay — mobile only, closes sidebar on tap */}
+      <div
+        className={cn(
+          'fixed inset-0 z-30 lg:hidden transition-opacity duration-300',
+          open ? 'opacity-100' : 'opacity-0 pointer-events-none',
+        )}
+        style={{ background: 'rgba(0,0,0,0.4)' }}
+        onClick={close}
+        aria-hidden="true"
+      />
+
+      {/* Sidebar panel */}
+      <aside
+        className={cn(
+          // Mobile: fixed overlay panel that slides in from left
+          'fixed inset-y-0 left-0 z-40 w-72 bg-white border-r border-gray-200 flex flex-col',
+          'transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform',
+          open ? 'translate-x-0' : '-translate-x-full',
+          // Desktop: static, always visible in the flex flow
+          'lg:relative lg:translate-x-0 lg:w-60 lg:z-auto lg:transition-none lg:will-change-auto',
+        )}
+      >
         {/* Brand */}
-        <div className="h-14 flex items-center px-5 border-b border-gray-200 shrink-0">
+        <div className="h-14 flex items-center justify-between px-5 border-b border-gray-200 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-gray-900 flex items-center justify-center shrink-0">
               <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-white">
@@ -188,6 +223,17 @@ export function Sidebar() {
             </div>
             <span className="text-sm font-semibold text-gray-900 tracking-tight">Harambal</span>
           </div>
+
+          {/* Close button — visible only on mobile */}
+          <button
+            onClick={close}
+            className="lg:hidden flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+            aria-label="Cerrar menú"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
         {/* Navigation */}
@@ -200,7 +246,7 @@ export function Sidebar() {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150',
+                    'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150',
                     active
                       ? 'bg-gray-100 text-gray-900 font-medium'
                       : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50 font-normal',
@@ -214,7 +260,7 @@ export function Sidebar() {
           </div>
         </nav>
 
-        {/* Help Center — replaces user profile */}
+        {/* Help Center */}
         <div className="px-3 py-3 border-t border-gray-200 shrink-0">
           <button
             onClick={() => setShowHelp(true)}

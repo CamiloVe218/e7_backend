@@ -21,11 +21,13 @@ export class ServiceRequestRepository {
     return this.prisma.serviceRequest.create({ data, include: REQUEST_INCLUDE });
   }
 
-  findMany(args: { where?: Prisma.ServiceRequestWhereInput; orderBy?: any } = {}) {
+  findMany(args: { where?: Prisma.ServiceRequestWhereInput; orderBy?: any; take?: number; skip?: number } = {}) {
     return this.prisma.serviceRequest.findMany({
       where: args.where,
       include: REQUEST_INCLUDE,
       orderBy: args.orderBy ?? { createdAt: 'desc' },
+      take: args.take,
+      skip: args.skip,
     });
   }
 
