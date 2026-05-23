@@ -167,7 +167,7 @@ function Counter({ value, onChange, min = 0 }: { value: number; onChange: (v: nu
   );
 }
 
-const OVERLINE = 'text-[10px] font-bold tracking-[0.1em] uppercase text-gray-400';
+const OVERLINE = 'text-[11px] font-bold tracking-[0.08em] uppercase text-gray-400';
 
 // ── Card form component ─────────────────────────────────────────────────────
 
@@ -181,9 +181,9 @@ function CardFormSection({
   onChange: (field: keyof CardForm, value: string) => void;
 }) {
   const brand = getCardBrand(card.number);
-  const inputBase = 'w-full px-3.5 py-2.5 text-sm rounded-xl border bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none transition-colors duration-150 font-mono tracking-wider';
+  const inputBase = 'w-full px-3.5 py-2.5 text-sm rounded-xl border bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none transition-all duration-150 font-mono tracking-wider';
   const inputCls = (f: keyof CardForm) =>
-    `${inputBase} ${errors[f] ? 'border-red-300 focus:border-red-400 bg-red-50' : 'border-gray-200 hover:border-gray-300 focus:border-gray-900'}`;
+    `${inputBase} ${errors[f] ? 'border-red-300 focus:border-red-400 focus:shadow-[0_0_0_3px_rgba(239,68,68,0.1)] bg-red-50' : 'border-gray-200 hover:border-gray-300 focus:border-gray-900 focus:shadow-[0_0_0_3px_rgba(17,17,17,0.07)]'}`;
 
   return (
     <div className="space-y-3.5 p-4 rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -665,7 +665,7 @@ export function ServiceRequestDrawer({ isOpen, onClose, onSuccess, services, pre
               {services.map(svc => {
                 const { key } = getCatalogForService(svc.name);
                 return (
-                  <button key={svc.id} onClick={() => handleService(svc)} className="p-4 rounded-xl border border-gray-200 bg-white hover:border-gray-900 hover:shadow-sm text-left transition-all duration-150 group">
+                  <button key={svc.id} onClick={() => handleService(svc)} className="p-4 rounded-xl border border-gray-200 bg-white hover:border-gray-300 hover:shadow-md text-left transition-all duration-200 ease-premium active:scale-[0.97] group">
                     <p className="text-sm font-semibold text-gray-900 leading-tight">{SERVICE_LABELS[key] || svc.name}</p>
                   </button>
                 );
@@ -684,7 +684,7 @@ export function ServiceRequestDrawer({ isOpen, onClose, onSuccess, services, pre
                 const min = Math.min(...catItems.map(i => i.precio));
                 const max = Math.max(...catItems.map(i => i.precio));
                 return (
-                  <button key={cat} onClick={() => handleCategory(cat)} className="w-full flex items-center justify-between px-4 py-4 rounded-xl border border-gray-200 bg-white hover:border-gray-900 hover:shadow-sm transition-all duration-150 text-left group">
+                  <button key={cat} onClick={() => handleCategory(cat)} className="w-full flex items-center justify-between px-4 py-4 rounded-xl border border-gray-200 bg-white hover:border-gray-300 hover:shadow-md transition-all duration-200 ease-premium active:scale-[0.98] text-left group">
                     <span className="text-sm font-semibold text-gray-900">{CATEGORY_LABELS[cat] || cat}</span>
                     <div className="flex items-center gap-2.5">
                       <span className="text-xs text-gray-400">{formatCurrency(min)} – {formatCurrency(max)}</span>
@@ -705,7 +705,7 @@ export function ServiceRequestDrawer({ isOpen, onClose, onSuccess, services, pre
             <p className="text-sm text-gray-500 mb-6">Selecciona el tipo de trabajo</p>
             <div className="space-y-2">
               {items.map((it, idx) => (
-                <button key={idx} onClick={() => handleItem(idx)} className="w-full flex items-center justify-between px-4 py-3.5 rounded-xl border border-gray-200 bg-white hover:border-gray-900 hover:shadow-sm transition-all duration-150 text-left group">
+                <button key={idx} onClick={() => handleItem(idx)} className="w-full flex items-center justify-between px-4 py-3.5 rounded-xl border border-gray-200 bg-white hover:border-gray-300 hover:shadow-md transition-all duration-200 ease-premium active:scale-[0.98] text-left group">
                   <span className="text-sm font-medium text-gray-800 group-hover:text-gray-900">{it.nombre}</span>
                   <span className="text-sm font-bold text-gray-900 tabular-nums ml-4 shrink-0">
                     {formatCurrency(it.precio)}
@@ -765,9 +765,9 @@ export function ServiceRequestDrawer({ isOpen, onClose, onSuccess, services, pre
                     key={pm.value}
                     type="button"
                     onClick={() => { setSel(p => ({ ...p, paymentMethod: pm.value })); setCardErrors({ number: '', name: '', cvv: '', expiry: '' }); }}
-                    className={`flex-1 h-9 rounded-xl border text-sm font-semibold transition-all duration-150 ${
+                    className={`flex-1 h-9 rounded-xl border text-sm font-semibold transition-all duration-150 active:scale-[0.96] ${
                       sel.paymentMethod === pm.value
-                        ? 'border-gray-900 bg-gray-900 text-white'
+                        ? 'border-gray-900 bg-gray-900 text-white shadow-xs'
                         : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-800'
                     }`}
                   >
@@ -855,7 +855,7 @@ export function ServiceRequestDrawer({ isOpen, onClose, onSuccess, services, pre
           <button
             onClick={handleSubmit}
             disabled={loading || !step4Valid}
-            className="w-full h-11 text-sm font-bold rounded-xl bg-gray-900 hover:bg-gray-800 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full h-11 text-sm font-bold rounded-xl bg-gray-900 hover:bg-gray-800 active:scale-[0.98] text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {loading && (
               <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
