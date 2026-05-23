@@ -244,9 +244,9 @@ export function RequestCard({ request, role, onAccept, onUpdateStatus, loading }
 
   return (
     <>
-      <div className="bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-all duration-150 overflow-hidden shadow-card group">
+      <div className="bg-white rounded-xl border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all duration-200 ease-premium overflow-hidden shadow-card group">
         {/* Status accent */}
-        <div className={`h-0.5 w-full ${STATUS_DOT[request.status as keyof typeof STATUS_DOT]}`} />
+        <div className={`h-[3px] w-full ${STATUS_DOT[request.status as keyof typeof STATUS_DOT]}`} />
 
         <div className="p-5">
           {/* Header */}
@@ -306,12 +306,12 @@ export function RequestCard({ request, role, onAccept, onUpdateStatus, loading }
 
           {/* Actions */}
           {hasActions && (
-            <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100">
+            <div className="flex items-center gap-2 mt-4 pt-3.5 border-t border-gray-100">
               {canAccept && (
                 <button
                   onClick={() => onAccept!(request.id)}
                   disabled={loading || actionLoading}
-                  className="flex-1 h-8 text-xs font-semibold rounded-lg bg-gray-900 hover:bg-gray-800 text-white transition-colors disabled:opacity-40"
+                  className="flex-1 h-8 text-xs font-semibold rounded-lg bg-gray-900 hover:bg-gray-800 active:scale-[0.97] text-white transition-all disabled:opacity-40"
                 >
                   Aceptar
                 </button>
@@ -320,7 +320,7 @@ export function RequestCard({ request, role, onAccept, onUpdateStatus, loading }
                 <button
                   onClick={() => onUpdateStatus!(request.id, 'EN_PROCESO')}
                   disabled={loading || actionLoading}
-                  className="flex-1 h-8 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-40"
+                  className="flex-1 h-8 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] text-white transition-all disabled:opacity-40"
                 >
                   Iniciar servicio
                 </button>
@@ -329,7 +329,7 @@ export function RequestCard({ request, role, onAccept, onUpdateStatus, loading }
                 <button
                   onClick={handleFinalize}
                   disabled={loading || actionLoading}
-                  className="flex-1 h-8 text-xs font-semibold rounded-lg bg-gray-900 hover:bg-gray-800 text-white transition-colors disabled:opacity-40"
+                  className="flex-1 h-8 text-xs font-semibold rounded-lg bg-gray-900 hover:bg-gray-800 active:scale-[0.97] text-white transition-all disabled:opacity-40"
                 >
                   Finalizar
                 </button>
@@ -338,9 +338,9 @@ export function RequestCard({ request, role, onAccept, onUpdateStatus, loading }
                 <button
                   onClick={() => setShowCancelModal(true)}
                   disabled={loading || actionLoading}
-                  className="h-8 px-3 text-xs font-medium rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors disabled:opacity-40"
+                  className="h-8 px-3 text-xs font-medium rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50 border border-red-100 hover:border-red-200 transition-all disabled:opacity-40"
                 >
-                  Cancelar solicitud
+                  Cancelar
                 </button>
               )}
             </div>

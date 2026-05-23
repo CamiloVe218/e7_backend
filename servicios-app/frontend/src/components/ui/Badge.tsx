@@ -1,6 +1,6 @@
 import { HTMLAttributes } from 'react';
 import { RequestStatus } from '@/types';
-import { STATUS_LABELS, STATUS_DOT, STATUS_TEXT, cn } from '@/lib/utils';
+import { STATUS_LABELS, STATUS_DOT, STATUS_COLORS, cn } from '@/lib/utils';
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   variant?: 'default' | 'outline' | 'muted';
@@ -34,11 +34,15 @@ interface StatusBadgeProps {
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
   return (
-    <span className={cn('inline-flex items-center gap-1.5', className)}>
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-xs font-medium',
+        STATUS_COLORS[status],
+        className,
+      )}
+    >
       <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', STATUS_DOT[status])} />
-      <span className={cn('text-xs font-medium', STATUS_TEXT[status])}>
-        {STATUS_LABELS[status]}
-      </span>
+      {STATUS_LABELS[status]}
     </span>
   );
 }

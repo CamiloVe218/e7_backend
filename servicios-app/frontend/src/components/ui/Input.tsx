@@ -10,7 +10,7 @@ const inputBase   = [
   'placeholder:text-gray-400 transition-colors duration-150',
   'focus:outline-none',
 ].join(' ');
-const defaultBorder = 'border-gray-200 hover:border-gray-300 focus:border-gray-900';
+const defaultBorder = 'border-gray-200 hover:border-gray-300 focus:border-gray-900 focus:shadow-[0_0_0_3px_rgba(17,17,17,0.07)]';
 const errorBorder   = 'border-red-300 focus:border-red-500';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {

@@ -98,15 +98,24 @@ export default function RequestsPage() {
       {loading ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map(i => (
-            <div key={i} className="h-36 rounded-xl bg-gray-200 animate-pulse" />
+            <div key={i} className="h-36 skeleton" />
           ))}
         </div>
       ) : requests.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 rounded-xl border border-dashed border-gray-200 bg-white">
-          <svg className="w-8 h-8 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          <p className="text-sm text-gray-400">No hay solicitudes</p>
+        <div className="flex flex-col items-center justify-center py-14 rounded-xl border border-dashed border-gray-200 bg-white gap-2">
+          <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center">
+            <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <div className="text-center">
+            <p className="text-sm font-semibold text-gray-600">
+              {activeFilter ? 'Sin solicitudes con este filtro' : 'No hay solicitudes'}
+            </p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {activeFilter ? 'Prueba con un filtro diferente' : 'Tus solicitudes aparecerán aquí'}
+            </p>
+          </div>
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
