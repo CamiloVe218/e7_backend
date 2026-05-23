@@ -72,7 +72,7 @@ export default function LoginPage() {
   };
 
   const inputBase =
-    'w-full px-4 py-3 text-sm rounded-xl border border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 hover:border-gray-300 focus:outline-none focus:border-gray-900 transition-colors duration-150';
+    'w-full px-4 py-3 text-sm rounded-xl border border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 hover:border-gray-300 focus:outline-none focus:border-gray-900 focus:shadow-[0_0_0_3px_rgba(17,17,17,0.07)] transition-all duration-150';
 
   return (
     <div className="min-h-screen bg-white flex">
