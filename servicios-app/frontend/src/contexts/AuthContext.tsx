@@ -9,8 +9,7 @@ import {
   useCallback,
 } from 'react';
 import { useRouter } from 'next/navigation';
-import Cookies from 'js-cookie';
-import { authApi } from '@/lib/api';
+import { authApi, setAuthToken } from '@/lib/api';
 import { connectSocket, disconnectSocket } from '@/lib/socket';
 import { User } from '@/types';
 
@@ -35,46 +34,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const setAuth = useCallback((userData: User, tokenValue: string) => {
     setUser(userData);
     setToken(tokenValue);
-    localStorage.setItem('token', tokenValue);
-    Cookies.set('auth_token', tokenValue, { expires: 7 });
+    setAuthToken(tokenValue);
     connectSocket(userData.id);
   }, []);
 
   const clearAuth = useCallback(() => {
     setUser(null);
     setToken(null);
-    localStorage.removeItem('token');
-    Cookies.remove('auth_token');
+    setAuthToken(null);
     disconnectSocket();
+    // Fire-and-forget — clears the httpOnly cookie server-side
+    authApi.logout().catch(() => undefined);
   }, []);
 
   const refreshUser = useCallback(async () => {
     try {
-      const userData = await authApi.me();
-      setUser(userData);
+      const { user: userData, token: tokenValue } = await authApi.me();
+      setAuth(userData, tokenValue);
     } catch {
       clearAuth();
     }
-  }, [clearAuth]);
+  }, [setAuth, clearAuth]);
 
+  // On mount: restore session from httpOnly cookie via BFF
   useEffect(() => {
-    const storedToken = localStorage.getItem('token');
-    if (storedToken) {
-      setToken(storedToken);
-      authApi
-        .me()
-        .then((userData) => {
-          setUser(userData);
-          connectSocket(userData.id);
-        })
-        .catch(() => {
-          clearAuth();
-        })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
-  }, [clearAuth]);
+    authApi
+      .me()
+      .then(({ user: userData, token: tokenValue }) => {
+        setAuth(userData, tokenValue);
+      })
+      .catch(() => {
+        // No valid session cookie — user is logged out
+      })
+      .finally(() => setLoading(false));
+  }, [setAuth]);
 
   const getDashboardPath = (role: string) => {
     if (role === 'CLIENTE') return '/dashboard/client';

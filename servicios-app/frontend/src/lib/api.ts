@@ -1,8 +1,14 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
+// In-memory token state — never touches localStorage
+let _authToken: string | null = null;
+
+export function setAuthToken(token: string | null) {
+  _authToken = token;
+}
+
 function getToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('token');
+  return _authToken;
 }
 
 // ── Typed API error ──────────────────────────────────────────────────────────
@@ -87,20 +93,66 @@ async function request<T>(
   return res.json() as Promise<T>;
 }
 
+// BFF routes are same-origin (Next.js API routes) — no auth header needed
+async function bffRequest<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options.headers ?? {}),
+      },
+      credentials: 'same-origin',
+    });
+  } catch {
+    throw new ApiError(
+      0,
+      'NETWORK_ERROR',
+      'Sin conexión a internet. Verifica tu red e intenta de nuevo.',
+    );
+  }
+
+  if (!res.ok) {
+    let body: Record<string, any> = {};
+    try { body = await res.json(); } catch { /* non-JSON error body */ }
+
+    const message =
+      body?.message ??
+      HTTP_MESSAGES[res.status] ??
+      `Error ${res.status}`;
+
+    throw new ApiError(
+      res.status,
+      body?.code ?? 'UNKNOWN_ERROR',
+      message,
+      body?.details,
+      body?.suggestion,
+    );
+  }
+
+  return res.json() as Promise<T>;
+}
+
 // ── API modules ──────────────────────────────────────────────────────────────
 
 export const authApi = {
   login: (email: string, password: string) =>
-    request<{ user: any; token: string }>('/auth/login', {
+    bffRequest<{ user: any; token: string }>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     }),
   register: (data: any) =>
-    request<{ user: any; token: string }>('/auth/register', {
+    bffRequest<{ user: any; token: string }>('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  me: () => request<any>('/users/me'),
+  me: () => bffRequest<{ user: any; token: string }>('/api/auth/me'),
+  logout: () =>
+    bffRequest<{ success: boolean }>('/api/auth/logout', { method: 'POST' }),
 };
 
 export const servicesApi = {
