@@ -286,7 +286,7 @@ export function Header() {
           </button>
 
           {open && (
-            <div className="absolute right-0 top-full mt-1.5 w-60 rounded-xl border border-gray-200 bg-white shadow-dropdown z-50 overflow-hidden">
+            <div className="absolute right-0 top-full mt-1.5 w-60 rounded-xl border border-gray-200 bg-white shadow-dropdown z-50 overflow-hidden fade-up">
               <div className="px-4 py-3 border-b border-gray-100">
                 <p className="text-sm font-semibold text-gray-900 truncate">{user?.name}</p>
                 <p className="text-xs text-gray-400 truncate mt-0.5">{user?.email}</p>

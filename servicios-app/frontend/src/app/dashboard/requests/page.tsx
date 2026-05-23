@@ -83,9 +83,9 @@ export default function RequestsPage() {
           <button
             key={f.value}
             onClick={() => { setActiveFilter(f.value); setLoading(true); }}
-            className={`h-8 px-3 text-xs font-semibold rounded-lg transition-all duration-150 ${
+            className={`h-8 px-3 text-xs font-semibold rounded-lg transition-all duration-150 active:scale-[0.96] ${
               activeFilter === f.value
-                ? 'bg-gray-900 text-white'
+                ? 'bg-gray-900 text-white shadow-xs'
                 : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-gray-800'
             }`}
           >
