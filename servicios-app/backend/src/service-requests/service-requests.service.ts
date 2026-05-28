@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   ConflictException,
 } from '@nestjs/common';
+import { Prisma, RequestStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateRequestDto } from './dto/create-request.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
@@ -55,10 +56,10 @@ export class ServiceRequestsService {
     limit?: number;
     page?: number;
   }) {
-    const where: any = {};
+    const where: Prisma.ServiceRequestWhereInput = {};
 
     if (filters.status) {
-      where.status = filters.status;
+      where.status = filters.status as Prisma.EnumRequestStatusFilter;
     }
 
     if (filters.role === 'CLIENTE') {
@@ -68,23 +69,21 @@ export class ServiceRequestsService {
         where: { userId: filters.userId },
       });
       if (provider) {
-        if (filters.status) {
-          where.status = filters.status;
-        } else {
+        if (filters.status && filters.status !== 'PENDIENTE') {
+          where.providerId = provider.id;
+        } else if (!filters.status) {
           where.OR = [
             { status: 'PENDIENTE' },
             { providerId: provider.id },
           ];
         }
-        if (filters.status && filters.status !== 'PENDIENTE') {
-          where.providerId = provider.id;
-          delete where.OR;
-        }
       }
     }
 
     const take = filters.limit;
-    const skip = filters.limit && filters.page ? (filters.page - 1) * filters.limit : undefined;
+    const skip = filters.limit && filters.page
+      ? (filters.page - 1) * filters.limit
+      : undefined;
 
     return this.repository.findMany({ where, take, skip });
   }
@@ -186,20 +185,34 @@ export class ServiceRequestsService {
       );
     }
 
-    const updated = await this.repository.update(requestId, { status: dto.status as any });
+    const isTerminal = dto.status === 'FINALIZADA' || dto.status === 'CANCELADA';
 
-    if (dto.status === 'FINALIZADA' || dto.status === 'CANCELADA') {
-      if (request.providerId) {
-        await this.prisma.provider.update({
+    // Wrap both the status update and the provider availability reset in a
+    // single transaction so they either both succeed or both fail.
+    const updated = await this.repository.transaction(async (tx) => {
+      const result = await tx.serviceRequest.update({
+        where: { id: requestId },
+        data: { status: dto.status as unknown as RequestStatus },
+        include: REQUEST_INCLUDE,
+      });
+
+      if (isTerminal && request.providerId) {
+        await tx.provider.update({
           where: { id: request.providerId },
           data: { isAvailable: true },
         });
       }
-    }
+
+      return result;
+    });
 
     this.notifications.notifyUser(request.clientId, 'request:status_changed', updated);
     if (request.provider) {
-      this.notifications.notifyUser(request.provider.user.id, 'request:status_changed', updated);
+      this.notifications.notifyUser(
+        request.provider.user.id,
+        'request:status_changed',
+        updated,
+      );
     }
     this.notifications.notifyAll('request:updated', updated);
 
@@ -207,18 +220,18 @@ export class ServiceRequestsService {
   }
 
   async getHistory(userId: string, role: string) {
-    const where: any = {};
+    const where: Prisma.ServiceRequestWhereInput = {
+      status: { in: ['FINALIZADA', 'CANCELADA'] },
+    };
 
     if (role === 'CLIENTE') {
       where.clientId = userId;
-      where.status = { in: ['FINALIZADA', 'CANCELADA'] };
     } else if (role === 'PROVEEDOR') {
       const provider = await this.prisma.provider.findUnique({
         where: { userId },
       });
       if (provider) {
         where.providerId = provider.id;
-        where.status = { in: ['FINALIZADA', 'CANCELADA'] };
       }
     }
 

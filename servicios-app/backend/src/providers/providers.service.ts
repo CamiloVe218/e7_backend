@@ -61,7 +61,13 @@ export class ProvidersService {
     });
   }
 
-  async updateProfile(userId: string, data: any) {
+  async updateProfile(userId: string, data: {
+    bio?: string;
+    serviceType?: string[];
+    lat?: number;
+    lng?: number;
+    isAvailable?: boolean;
+  }) {
     const provider = await this.prisma.provider.findUnique({
       where: { userId },
     });

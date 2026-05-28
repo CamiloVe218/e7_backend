@@ -39,11 +39,17 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Security audit
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
       - name: Unit tests
         run: npm test -- --passWithNoTests --forceExit
 
-      - name: Test coverage
-        run: npm run test:cov -- --passWithNoTests --forceExit
+      - name: Test coverage (min 60%)
+        run: |
+          npm run test:cov -- --passWithNoTests --forceExit \
+            --coverageThreshold='{"global":{"statements":60,"branches":60,"functions":55,"lines":60}}'
 
       - name: Build
         run: npm run build
@@ -58,7 +64,7 @@ jobs:
 
   # ─── Frontend ─────────────────────────────────────────────────────────────────
   frontend:
-    name: Frontend — lint, build
+    name: Frontend — lint, typecheck, build
     runs-on: ubuntu-latest
 
     defaults:
@@ -79,8 +85,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Lint
+        run: npm run lint
+
       - name: Type check
         run: npx tsc --noEmit
+
+      - name: Security audit
+        run: npm audit --audit-level=high
+        continue-on-error: true
 
       - name: Build
         run: npm run build

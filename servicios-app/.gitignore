@@ -10,7 +10,6 @@ coverage/
 .env
 .env.local
 .env.production
-!frontend/.env.production
 
 # logs
 npm-debug.log*
@@ -24,3 +23,7 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+.harambal/
+
+# test artifacts
+*.tsbuildinfo

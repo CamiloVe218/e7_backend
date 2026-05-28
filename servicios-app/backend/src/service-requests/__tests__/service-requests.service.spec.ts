@@ -6,6 +6,18 @@ import { ServiceRequestRepository } from '../repositories/service-request.reposi
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsGateway } from '../../notifications/notifications.gateway';
 
+// Mock Prisma transaction client used inside updateStatus and acceptRequest
+const mockTx = {
+  serviceRequest: {
+    findFirst: jest.fn(),
+    findUnique: jest.fn(),
+    update: jest.fn(),
+  },
+  provider: {
+    update: jest.fn(),
+  },
+};
+
 const mockRepository = {
   create: jest.fn(),
   findMany: jest.fn(),
@@ -13,7 +25,8 @@ const mockRepository = {
   findFirst: jest.fn(),
   update: jest.fn(),
   count: jest.fn(),
-  transaction: jest.fn(),
+  // Execute the callback with the mockTx so inner logic is exercised
+  transaction: jest.fn().mockImplementation((fn: (tx: typeof mockTx) => Promise<unknown>) => fn(mockTx)),
 };
 
 const mockPrisma = {
@@ -31,6 +44,11 @@ describe('ServiceRequestsService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+
+    // Reset transaction to always call the fn
+    mockRepository.transaction.mockImplementation(
+      (fn: (tx: typeof mockTx) => Promise<unknown>) => fn(mockTx),
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -59,16 +77,19 @@ describe('ServiceRequestsService', () => {
       mockRepository.findOne.mockResolvedValue(baseRequest);
       mockPrisma.provider.findUnique.mockResolvedValue({ id: 'prov-1' });
       mockPrisma.provider.update.mockResolvedValue({});
-      mockRepository.update.mockResolvedValue({ ...baseRequest, status: 'EN_PROCESO' });
+      // tx mocks used inside the transaction callback
+      mockTx.serviceRequest.update.mockResolvedValue({ ...baseRequest, status: 'EN_PROCESO' });
+      mockTx.provider.update.mockResolvedValue({});
     });
 
     it('allows ACEPTADA → EN_PROCESO', async () => {
+      mockTx.serviceRequest.update.mockResolvedValue({ ...baseRequest, status: 'EN_PROCESO' });
       const result = await service.updateStatus('req-1', 'user-prov-1', { status: RequestStatus.EN_PROCESO });
       expect(result.status).toBe('EN_PROCESO');
     });
 
     it('allows ACEPTADA → CANCELADA', async () => {
-      mockRepository.update.mockResolvedValue({ ...baseRequest, status: 'CANCELADA' });
+      mockTx.serviceRequest.update.mockResolvedValue({ ...baseRequest, status: 'CANCELADA' });
       const result = await service.updateStatus('req-1', 'client-1', { status: RequestStatus.CANCELADA });
       expect(result.status).toBe('CANCELADA');
     });
@@ -87,7 +108,7 @@ describe('ServiceRequestsService', () => {
 
     it('allows EN_PROCESO → FINALIZADA', async () => {
       mockRepository.findOne.mockResolvedValue({ ...baseRequest, status: 'EN_PROCESO' });
-      mockRepository.update.mockResolvedValue({ ...baseRequest, status: 'FINALIZADA' });
+      mockTx.serviceRequest.update.mockResolvedValue({ ...baseRequest, status: 'FINALIZADA' });
       const result = await service.updateStatus('req-1', 'user-prov-1', { status: RequestStatus.FINALIZADA });
       expect(result.status).toBe('FINALIZADA');
     });
@@ -101,7 +122,7 @@ describe('ServiceRequestsService', () => {
 
     it('allows PENDIENTE → CANCELADA', async () => {
       mockRepository.findOne.mockResolvedValue({ ...baseRequest, status: 'PENDIENTE', providerId: null });
-      mockRepository.update.mockResolvedValue({ ...baseRequest, status: 'CANCELADA' });
+      mockTx.serviceRequest.update.mockResolvedValue({ ...baseRequest, status: 'CANCELADA' });
       mockPrisma.provider.findUnique.mockResolvedValue(null);
       const result = await service.updateStatus('req-1', 'client-1', { status: RequestStatus.CANCELADA });
       expect(result.status).toBe('CANCELADA');
@@ -119,6 +140,27 @@ describe('ServiceRequestsService', () => {
       await expect(
         service.updateStatus('req-1', 'client-1', { status: RequestStatus.CANCELADA }),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('resets provider availability when status becomes FINALIZADA', async () => {
+      mockRepository.findOne.mockResolvedValue({ ...baseRequest, status: 'EN_PROCESO' });
+      mockTx.serviceRequest.update.mockResolvedValue({ ...baseRequest, status: 'FINALIZADA' });
+
+      await service.updateStatus('req-1', 'user-prov-1', { status: RequestStatus.FINALIZADA });
+
+      expect(mockTx.provider.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { isAvailable: true } }),
+      );
+    });
+
+    it('resets provider availability when status becomes CANCELADA', async () => {
+      mockTx.serviceRequest.update.mockResolvedValue({ ...baseRequest, status: 'CANCELADA' });
+
+      await service.updateStatus('req-1', 'client-1', { status: RequestStatus.CANCELADA });
+
+      expect(mockTx.provider.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { isAvailable: true } }),
+      );
     });
   });
 
@@ -194,17 +236,133 @@ describe('ServiceRequestsService', () => {
     });
   });
 
+  // ── findOne ──────────────────────────────────────────────────────────────────
+
+  describe('findOne', () => {
+    it('returns the request when found', async () => {
+      const req = { id: 'req-1', status: 'PENDIENTE' };
+      mockRepository.findOne.mockResolvedValue(req);
+
+      const result = await service.findOne('req-1');
+
+      expect(result.id).toBe('req-1');
+    });
+
+    it('throws NotFoundException when request does not exist', async () => {
+      mockRepository.findOne.mockResolvedValue(null);
+
+      await expect(service.findOne('nonexistent')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  // ── findAll ──────────────────────────────────────────────────────────────────
+
+  describe('findAll', () => {
+    beforeEach(() => {
+      mockRepository.findMany.mockResolvedValue([]);
+    });
+
+    it('returns all requests for ADMIN role (no user filter)', async () => {
+      await service.findAll({ role: 'ADMIN', userId: 'admin-1' });
+      expect(mockRepository.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: {} }),
+      );
+    });
+
+    it('filters by clientId for CLIENTE role', async () => {
+      await service.findAll({ role: 'CLIENTE', userId: 'client-1' });
+      expect(mockRepository.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { clientId: 'client-1' } }),
+      );
+    });
+
+    it('filters by status when provided', async () => {
+      await service.findAll({ role: 'CLIENTE', userId: 'client-1', status: 'PENDIENTE' });
+      expect(mockRepository.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ status: 'PENDIENTE' }) }),
+      );
+    });
+
+    it('uses OR filter for PROVEEDOR with no status (pending + own requests)', async () => {
+      mockPrisma.provider.findUnique.mockResolvedValue({ id: 'prov-1' });
+
+      await service.findAll({ role: 'PROVEEDOR', userId: 'user-prov-1' });
+
+      expect(mockRepository.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: [{ status: 'PENDIENTE' }, { providerId: 'prov-1' }],
+          }),
+        }),
+      );
+    });
+
+    it('filters by providerId for PROVEEDOR with non-PENDIENTE status', async () => {
+      mockPrisma.provider.findUnique.mockResolvedValue({ id: 'prov-1' });
+
+      await service.findAll({ role: 'PROVEEDOR', userId: 'user-prov-1', status: 'FINALIZADA' });
+
+      expect(mockRepository.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ providerId: 'prov-1', status: 'FINALIZADA' }),
+        }),
+      );
+    });
+
+    it('applies limit and page for pagination', async () => {
+      await service.findAll({ role: 'ADMIN', userId: 'admin-1', limit: 10, page: 2 });
+      expect(mockRepository.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 10, skip: 10 }),
+      );
+    });
+  });
+
+  // ── getHistory ────────────────────────────────────────────────────────────────
+
+  describe('getHistory', () => {
+    beforeEach(() => {
+      mockRepository.findMany.mockResolvedValue([]);
+    });
+
+    it('returns terminal requests for CLIENTE', async () => {
+      await service.getHistory('client-1', 'CLIENTE');
+      expect(mockRepository.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            clientId: 'client-1',
+            status: { in: ['FINALIZADA', 'CANCELADA'] },
+          }),
+        }),
+      );
+    });
+
+    it('returns terminal requests for PROVEEDOR', async () => {
+      mockPrisma.provider.findUnique.mockResolvedValue({ id: 'prov-1' });
+
+      await service.getHistory('user-prov-1', 'PROVEEDOR');
+
+      expect(mockRepository.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            providerId: 'prov-1',
+            status: { in: ['FINALIZADA', 'CANCELADA'] },
+          }),
+        }),
+      );
+    });
+  });
+
   // ── getStats ─────────────────────────────────────────────────────────────────
 
   describe('getStats', () => {
     it('returns counts for all status buckets', async () => {
       mockRepository.count
-        .mockResolvedValueOnce(100) // total
-        .mockResolvedValueOnce(30)  // PENDIENTE
-        .mockResolvedValueOnce(20)  // ACEPTADA
-        .mockResolvedValueOnce(10)  // EN_PROCESO
-        .mockResolvedValueOnce(35)  // FINALIZADA
-        .mockResolvedValueOnce(5);  // CANCELADA
+        .mockResolvedValueOnce(100)
+        .mockResolvedValueOnce(30)
+        .mockResolvedValueOnce(20)
+        .mockResolvedValueOnce(10)
+        .mockResolvedValueOnce(35)
+        .mockResolvedValueOnce(5);
 
       const stats = await service.getStats();
 

@@ -2,6 +2,12 @@
 
 Sistema profesional de contratación de mano de obra local. Los clientes publican solicitudes de servicio, los proveedores las aceptan y ejecutan, los pagos quedan registrados y las calificaciones cierran el ciclo.
 
+[![CI](https://github.com/CamiloVe218/e7_backend/actions/workflows/ci.yml/badge.svg)](https://github.com/CamiloVe218/e7_backend/actions/workflows/ci.yml)
+![Node 20](https://img.shields.io/badge/node-20-brightgreen)
+![NestJS 10](https://img.shields.io/badge/NestJS-10-red)
+![Next.js 14](https://img.shields.io/badge/Next.js-14-black)
+![PostgreSQL 15](https://img.shields.io/badge/PostgreSQL-15-blue)
+
 ---
 
 ## Stack Tecnológico
@@ -12,7 +18,8 @@ Sistema profesional de contratación de mano de obra local. Los clientes publica
 | Backend | NestJS 10, TypeScript, Passport JWT |
 | Base de datos | PostgreSQL 15 (Prisma ORM) |
 | Tiempo real | Socket.IO (WebSockets) |
-| Autenticación | JWT Bearer tokens + bcrypt |
+| Autenticación | JWT (httpOnly cookie) vía BFF pattern |
+| Seguridad | Helmet, Throttler global, bcrypt, ValidationPipe |
 | Documentación | Swagger / OpenAPI (`/api/docs`) |
 | Infraestructura | Docker Compose, Dockerfiles multi-stage |
 | CI/CD | GitHub Actions |
@@ -22,40 +29,262 @@ Sistema profesional de contratación de mano de obra local. Los clientes publica
 
 ## Arquitectura del Sistema
 
+```mermaid
+graph TB
+    Browser["Browser\nNext.js 14 App Router"]
+
+    subgraph BFF["BFF Layer (Next.js API Routes)"]
+        Login["/api/auth/login"]
+        Register["/api/auth/register"]
+        Me["/api/auth/me"]
+        Logout["/api/auth/logout"]
+    end
+
+    subgraph Backend["Backend NestJS 10 · Railway"]
+        Auth["auth module\nJWT + bcrypt"]
+        SR["service-requests\nState Machine"]
+        SVC["services\nCatálogo"]
+        PROV["providers\nPerfiles"]
+        PAY["payments\nSimulación"]
+        RAT["ratings\nCalificaciones"]
+        WS["notifications\nSocket.IO Gateway"]
+    end
+
+    DB[(PostgreSQL 15\nPrisma ORM)]
+
+    Browser -- "httpOnly cookie\nauth_token" --> BFF
+    BFF -- "Bearer JWT\n(server-side)" --> Auth
+    Browser -- "REST + Bearer JWT\n(memory token)" --> SR
+    Browser -- "REST + Bearer JWT" --> SVC
+    Browser -- "REST + Bearer JWT" --> PROV
+    Browser -- "REST + Bearer JWT" --> PAY
+    Browser -- "REST + Bearer JWT" --> RAT
+    Browser -- "WebSocket" --> WS
+    Auth --> DB
+    SR --> DB
+    SVC --> DB
+    PROV --> DB
+    PAY --> DB
+    RAT --> DB
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        CLIENTE (Browser)                        │
-│              Next.js 14 App Router + Tailwind CSS               │
-│                                                                 │
-│   ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐ │
-│   │ /auth/login  │  │ /dashboard/  │  │  WebSocket (Socket.IO│ │
-│   │ /auth/reg..  │  │ client       │  │  cliente)            │ │
-│   │              │  │ provider     │  │                      │ │
-│   │              │  │ admin        │  └──────────────────────┘ │
-│   └──────────────┘  └──────────────┘                           │
-└─────────────────────────────────────────────────────────────────┘
-              │ HTTP (REST + JWT Bearer)    │ WS
-              ▼                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     BACKEND (NestJS 10)                         │
-│                                                                 │
-│  ┌──────────┐ ┌───────────────┐ ┌──────────┐ ┌─────────────┐  │
-│  │   auth   │ │service-request│ │ services │ │  providers  │  │
-│  │          │ │  (state mach.)│ │(catalog) │ │  (profiles) │  │
-│  └──────────┘ └───────────────┘ └──────────┘ └─────────────┘  │
-│  ┌──────────┐ ┌───────────────┐ ┌────────────────────────────┐ │
-│  │ payments │ │    ratings    │ │  notifications (WS Gateway)│ │
-│  │(simul.)  │ │               │ │                            │ │
-│  └──────────┘ └───────────────┘ └────────────────────────────┘ │
-│                       │ Prisma ORM                              │
-└───────────────────────┼─────────────────────────────────────────┘
-                        ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    PostgreSQL 15                                 │
-│  users · providers · services · service_requests                │
-│  payments · ratings · availability                              │
-└─────────────────────────────────────────────────────────────────┘
+
+---
+
+## Modelo Entidad-Relación
+
+```mermaid
+erDiagram
+    User {
+        String id PK
+        String email UK
+        String password
+        String name
+        Role role
+        DateTime createdAt
+    }
+    Provider {
+        String id PK
+        String userId FK
+        String bio
+        String location
+        Boolean available
+        Float rating
+        Int totalRatings
+    }
+    Service {
+        String id PK
+        String name
+        String description
+        Float basePrice
+        String category
+        Boolean active
+    }
+    ServiceRequest {
+        String id PK
+        String clientId FK
+        String providerId FK
+        String serviceId FK
+        RequestStatus status
+        String description
+        Float price
+        DateTime scheduledAt
+        String address
+        DateTime createdAt
+    }
+    Payment {
+        String id PK
+        String requestId FK
+        Float amount
+        PaymentStatus status
+        String method
+        DateTime paidAt
+    }
+    Rating {
+        String id PK
+        String requestId FK
+        String clientId FK
+        String providerId FK
+        Int score
+        String comment
+        DateTime createdAt
+    }
+    Availability {
+        String id PK
+        String providerId FK
+        Int dayOfWeek
+        String startTime
+        String endTime
+    }
+
+    User ||--o{ ServiceRequest : "hace (CLIENTE)"
+    User ||--o| Provider : "es (PROVEEDOR)"
+    Provider ||--o{ ServiceRequest : "atiende"
+    Service ||--o{ ServiceRequest : "describe"
+    ServiceRequest ||--o| Payment : "genera"
+    ServiceRequest ||--o| Rating : "recibe"
+    Provider ||--o{ Availability : "define"
+    Provider ||--o{ Rating : "recibe"
 ```
+
+---
+
+## Flujo de Autenticación (BFF Pattern)
+
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant BFF as Next.js BFF<br/>/api/auth/*
+    participant API as NestJS Backend<br/>(Railway)
+    participant DB as PostgreSQL
+
+    Note over B,DB: Login Flow
+    B->>BFF: POST /api/auth/login {email, password}
+    BFF->>API: POST /api/auth/login {email, password}
+    API->>DB: prisma.user.findUnique()
+    DB-->>API: User record
+    API->>API: bcrypt.compare(password, hash)
+    API->>API: jwtService.sign({sub, email, role})
+    API-->>BFF: {user, token: "eyJ..."}
+    BFF->>B: Set-Cookie: auth_token=eyJ... (httpOnly, secure, sameSite=lax)
+    Note over B: Token en cookie httpOnly<br/>JS no puede accederlo
+
+    Note over B,DB: Hydration on page load
+    B->>BFF: GET /api/auth/me (cookie automática)
+    BFF->>API: GET /api/auth/me (Bearer token extraído de cookie)
+    API->>DB: prisma.user.findUnique()
+    API-->>BFF: User profile
+    BFF-->>B: {user, token} → React memory state
+
+    Note over B,DB: API calls (token en memoria React)
+    B->>API: GET /api/service-requests (Bearer desde memoria)
+    API->>API: JwtAuthGuard → JwtStrategy.validate()
+    API-->>B: ServiceRequest[]
+
+    Note over B,DB: Logout
+    B->>BFF: POST /api/auth/logout
+    BFF->>B: Set-Cookie: auth_token="" (maxAge=0, borrar cookie)
+    Note over B: Cookie eliminada,<br/>memoria React limpiada
+```
+
+---
+
+## Máquina de Estados — Solicitudes de Servicio
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDIENTE : CLIENTE crea solicitud
+
+    PENDIENTE --> ACEPTADA : PROVEEDOR acepta
+    PENDIENTE --> CANCELADA : CLIENTE o ADMIN cancela
+
+    ACEPTADA --> EN_PROCESO : PROVEEDOR inicia trabajo
+    ACEPTADA --> CANCELADA : CLIENTE o PROVEEDOR cancela
+
+    EN_PROCESO --> FINALIZADA : PROVEEDOR completa
+    EN_PROCESO --> CANCELADA : ADMIN cancela (excepcional)
+
+    FINALIZADA --> [*] : CLIENTE puede calificar
+    CANCELADA --> [*]
+```
+
+Las transiciones son validadas en `service-requests.service.ts` mediante un mapa `validTransitions` — cualquier transición inválida lanza `BadRequestException` antes de tocar la base de datos.
+
+---
+
+## Estructura del Proyecto
+
+```
+servicios-app/
+├── backend/
+│   ├── src/
+│   │   ├── auth/                  # JWT strategy, guards, decoradores
+│   │   │   ├── __tests__/         # Unit + integration tests
+│   │   │   ├── decorators/        # @CurrentUser(), @Roles()
+│   │   │   ├── dto/               # LoginDto, RegisterDto
+│   │   │   ├── guards/            # JwtAuthGuard, RolesGuard
+│   │   │   └── strategies/        # JwtStrategy
+│   │   ├── service-requests/      # Dominio principal
+│   │   │   ├── __tests__/         # Tests de máquina de estados
+│   │   │   ├── dto/
+│   │   │   └── repositories/      # Repository pattern
+│   │   ├── services/              # Catálogo de servicios
+│   │   ├── providers/             # Perfiles de proveedores
+│   │   ├── payments/              # Pagos simulados
+│   │   ├── ratings/               # Calificaciones
+│   │   ├── notifications/         # WebSocket gateway (Socket.IO)
+│   │   └── prisma/                # PrismaService global
+│   └── prisma/
+│       ├── schema.prisma          # 7 modelos, 3 enums
+│       └── seed.ts                # Datos de prueba
+├── frontend/
+│   └── src/
+│       ├── app/
+│       │   ├── api/auth/          # BFF routes (httpOnly cookie)
+│       │   │   ├── login/route.ts
+│       │   │   ├── register/route.ts
+│       │   │   ├── me/route.ts
+│       │   │   └── logout/route.ts
+│       │   ├── auth/              # Login, registro
+│       │   └── dashboard/         # Dashboards por rol
+│       │       ├── client/        # Vista CLIENTE
+│       │       ├── provider/      # Vista PROVEEDOR
+│       │       └── admin/         # Vista ADMIN
+│       ├── components/
+│       │   ├── layout/            # Sidebar, Header
+│       │   ├── requests/          # RequestCard, ServiceRequestDrawer
+│       │   └── ui/                # Input, Badge, Toast, Button
+│       ├── contexts/              # AuthContext
+│       ├── hooks/                 # useSocket
+│       ├── lib/                   # api.ts, socket.ts, utils.ts
+│       ├── types/                 # TypeScript interfaces
+│       └── middleware.ts          # Protección de rutas Next.js
+├── infrastructure/
+│   ├── docker-compose.yml         # postgres + backend + frontend
+│   ├── Dockerfile.backend         # Multi-stage (build + production)
+│   ├── Dockerfile.frontend        # Multi-stage
+│   └── .env.example
+├── docs/
+│   ├── ARCHITECTURE.md
+│   └── PATTERNS.md
+└── .github/
+    └── workflows/
+        └── ci.yml                 # backend → frontend → docker
+```
+
+---
+
+## Patrones de Diseño
+
+| Patrón | Ubicación | Propósito |
+|---|---|---|
+| **BFF (Backend for Frontend)** | `frontend/src/app/api/auth/` | Proxy server-side que almacena JWT en httpOnly cookie, eliminando riesgo XSS |
+| **Repository Pattern** | `service-requests/repositories/` | Desacopla el acceso a Prisma del servicio; facilita tests con mocks |
+| **State Machine** | `service-requests.service.ts` | `validTransitions` Record aplica reglas de dominio antes de cualquier write |
+| **Strategy Pattern** | `auth/strategies/jwt.strategy.ts` | Passport-JWT encapsula la estrategia de autenticación intercambiable |
+| **Guard Pattern** | `auth/guards/` | Separa autenticación (`JwtAuthGuard`) de autorización (`RolesGuard`) |
+| **Decorator Pattern** | `auth/decorators/` | `@CurrentUser()` y `@Roles()` como metadata declarativa sin lógica en controladores |
+| **Module Pattern** | Toda la aplicación NestJS | Encapsulación por dominio con DI container propio |
+| **Observer Pattern** | `notifications/notifications.gateway.ts` | Socket.IO emite eventos a sockets registrados sin acoplamiento directo |
 
 ---
 
@@ -75,119 +304,16 @@ Sistema profesional de contratación de mano de obra local. Los clientes publica
 
 ---
 
-## Flujo de Autenticación JWT
-
-```
-Cliente                     Backend
-  │                            │
-  │  POST /api/auth/register   │
-  │ ──────────────────────────►│
-  │                            │  bcrypt.hash(password)
-  │                            │  prisma.user.create()
-  │                            │  jwtService.sign({ sub, email, role })
-  │  { user, token: JWT }      │
-  │ ◄──────────────────────────│
-  │                            │
-  │  GET /api/... + Bearer JWT │
-  │ ──────────────────────────►│
-  │                            │  JwtAuthGuard → passport-jwt
-  │                            │  JwtStrategy.validate() → prisma.user
-  │                            │  @CurrentUser() inyecta usuario
-  │  Respuesta protegida       │
-  │ ◄──────────────────────────│
-```
-
----
-
-## Máquina de Estados — Solicitudes de Servicio
-
-```
-                ┌───────────┐
-   CREAR ──────►│ PENDIENTE │
-                └─────┬─────┘
-                      │ Proveedor acepta
-                      ▼
-                ┌───────────┐
-                │  ACEPTADA │
-                └─────┬─────┘
-                      │ Proveedor inicia
-                      ▼
-                ┌───────────┐
-                │ EN_PROCESO│
-                └─────┬─────┘
-                      │ Proveedor finaliza
-                      ▼
-                ┌───────────┐
-                │ FINALIZADA│
-                └───────────┘
-  (CANCELADA es válido desde PENDIENTE, ACEPTADA o EN_PROCESO)
-```
-
----
-
 ## WebSockets — Eventos en Tiempo Real
 
-| Evento (cliente → servidor) | Descripción |
-|---|---|
-| `register` | Asocia un `userId` al socket actual |
-
-| Evento (servidor → cliente) | Descripción |
-|---|---|
-| `registered` | Confirmación de registro del socket |
-| `request:new` | Nueva solicitud creada (broadcast) |
-| `request:accepted` | Solicitud aceptada → notifica al cliente |
-| `request:updated` | Solicitud actualizada (broadcast) |
-| `request:status_changed` | Cambio de estado → notifica a cliente y proveedor |
-
----
-
-## Estructura del Proyecto
-
-```
-servicios-app/
-├── backend/
-│   ├── src/
-│   │   ├── auth/                  # JWT strategy, guards, decoradores
-│   │   │   ├── __tests__/         # Unit + integration tests
-│   │   │   ├── decorators/
-│   │   │   ├── dto/
-│   │   │   ├── guards/
-│   │   │   └── strategies/
-│   │   ├── service-requests/      # Dominio principal
-│   │   │   ├── __tests__/
-│   │   │   ├── dto/
-│   │   │   └── repositories/      # Repository pattern (Prisma)
-│   │   ├── services/              # Catálogo de servicios
-│   │   ├── providers/             # Perfiles de proveedores
-│   │   ├── payments/              # Pagos simulados
-│   │   ├── ratings/               # Calificaciones
-│   │   ├── notifications/         # WebSocket gateway
-│   │   └── prisma/                # PrismaService global
-│   └── prisma/
-│       ├── schema.prisma
-│       └── seed.ts
-├── frontend/
-│   └── src/
-│       ├── app/
-│       │   ├── auth/              # Login, registro
-│       │   └── dashboard/         # Dashboards por rol
-│       ├── components/            # UI components reutilizables
-│       ├── contexts/              # AuthContext + estado global
-│       ├── hooks/                 # useSocket
-│       ├── lib/                   # api.ts, socket.ts, utils.ts
-│       └── middleware.ts          # Protección de rutas Next.js
-├── infrastructure/
-│   ├── docker-compose.yml
-│   ├── Dockerfile.backend         # Multi-stage (build + production)
-│   ├── Dockerfile.frontend        # Multi-stage
-│   └── .env.example
-├── docs/
-│   ├── ARCHITECTURE.md
-│   └── PATTERNS.md
-└── .github/
-    └── workflows/
-        └── ci.yml                 # Lint + test + build (backend y frontend)
-```
+| Dirección | Evento | Payload | Descripción |
+|---|---|---|---|
+| cliente → servidor | `register` | `{ userId }` | Asocia un userId al socket actual |
+| servidor → cliente | `registered` | `{ socketId }` | Confirmación de registro |
+| servidor → cliente | `request:new` | `ServiceRequest` | Nueva solicitud creada (broadcast) |
+| servidor → cliente | `request:accepted` | `ServiceRequest` | Solicitud aceptada — notifica al cliente |
+| servidor → cliente | `request:updated` | `ServiceRequest` | Actualización general (broadcast) |
+| servidor → cliente | `request:status_changed` | `{ request, oldStatus, newStatus }` | Cambio de estado — notifica a cliente y proveedor |
 
 ---
 
@@ -205,16 +331,16 @@ servicios-app/
 git clone <repo-url>
 cd servicios-app
 
-# Entorno del backend
+# Backend
 cp backend/.env.example backend/.env
-# Editar backend/.env — configurar DATABASE_URL y JWT_SECRET
+# Editar backend/.env: DATABASE_URL y JWT_SECRET
 
-# Entorno de Docker
+# Docker
 cp infrastructure/.env.example infrastructure/.env
-# Editar infrastructure/.env — configurar POSTGRES_PASSWORD y JWT_SECRET
+# Editar infrastructure/.env: POSTGRES_PASSWORD y JWT_SECRET
 ```
 
-Generar un JWT_SECRET seguro:
+Generar JWT_SECRET seguro (mínimo 64 caracteres):
 
 ```bash
 openssl rand -hex 64
@@ -250,6 +376,7 @@ npm run start:dev
 ```bash
 cd frontend
 npm install
+# Crear frontend/.env.local con NEXT_PUBLIC_API_URL y NEXT_PUBLIC_WS_URL
 npm run dev
 ```
 
@@ -261,7 +388,7 @@ npm run dev
 
 | Variable | Descripción | Ejemplo |
 |---|---|---|
-| `DATABASE_URL` | Connection string PostgreSQL | `postgresql://user:pass@localhost:5432/db` |
+| `DATABASE_URL` | Connection string PostgreSQL | `postgresql://user:pass@host:5432/db` |
 | `JWT_SECRET` | Secreto JWT (mín. 64 chars) | `openssl rand -hex 64` |
 | `JWT_EXPIRES_IN` | Duración del token | `7d` |
 | `PORT` | Puerto del servidor | `4000` |
@@ -288,16 +415,15 @@ npm run dev
 
 ## Datos de prueba (seed)
 
+```bash
+cd backend && npx prisma db seed
+```
+
 | Rol | Email | Contraseña |
 |---|---|---|
 | Admin | admin@demo.com | admin123 |
 | Cliente | cliente@demo.com | cliente123 |
 | Proveedor | proveedor@demo.com | proveedor123 |
-
-```bash
-cd backend
-npx prisma db seed
-```
 
 ---
 
@@ -305,20 +431,38 @@ npx prisma db seed
 
 Documentación interactiva completa en: **`http://localhost:4000/api/docs`** (Swagger UI).
 
-### Endpoints principales
+### Auth
 
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
 | POST | `/api/auth/register` | — | Registrar usuario |
 | POST | `/api/auth/login` | — | Login → JWT |
 | GET | `/api/auth/me` | Bearer | Perfil del usuario autenticado |
-| GET | `/api/services` | Bearer | Catálogo de servicios |
-| GET | `/api/service-requests` | Bearer | Listar solicitudes (filtradas por rol) |
+
+### Servicios
+
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| GET | `/api/services` | Bearer | Listar catálogo activo |
+| POST | `/api/services` | ADMIN | Crear servicio |
+| PATCH | `/api/services/:id` | ADMIN | Actualizar servicio |
+| DELETE | `/api/services/:id` | ADMIN | Desactivar servicio |
+
+### Solicitudes
+
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| GET | `/api/service-requests` | Bearer | Listar (filtradas por rol) |
 | POST | `/api/service-requests` | CLIENTE | Crear solicitud |
 | PATCH | `/api/service-requests/:id/accept` | PROVEEDOR | Aceptar solicitud |
 | PATCH | `/api/service-requests/:id/status` | Bearer | Cambiar estado |
 | GET | `/api/service-requests/history` | Bearer | Historial (FINALIZADA / CANCELADA) |
 | GET | `/api/service-requests/stats` | ADMIN | Estadísticas por estado |
+
+### Pagos y Calificaciones
+
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
 | POST | `/api/payments/:id/simulate` | Bearer | Simular pago |
 | POST | `/api/ratings` | CLIENTE | Calificar servicio finalizado |
 | GET | `/api/ratings/provider/:id` | Bearer | Calificaciones de un proveedor |
@@ -330,59 +474,64 @@ Documentación interactiva completa en: **`http://localhost:4000/api/docs`** (Sw
 ```bash
 cd backend
 
-# Tests unitarios
+# Todos los tests
 npm test
 
-# Con reporte de cobertura
+# Con cobertura
 npm run test:cov
 
-# En modo watch (desarrollo)
+# En modo watch
 npm run test:watch
 ```
 
-El proyecto incluye:
+El proyecto incluye **55 tests** distribuidos en:
 
-- **Tests unitarios** — `AuthService`, `ServiceRequestsService` (máquina de estados, transacciones), `ServicesService`, `UsersService`
-- **Tests de integración** — capa HTTP de `auth` usando supertest + NestJS TestingModule (sin base de datos real, compatible con CI)
+| Suite | Tipo | Qué verifica |
+|---|---|---|
+| `auth.service.spec.ts` | Unitario | bcrypt hash, JWT sign, validación de credenciales |
+| `auth.controller.spec.ts` | Integración HTTP | POST /register, POST /login, GET /me con supertest |
+| `service-requests.service.spec.ts` | Unitario | Máquina de estados — transiciones válidas e inválidas |
+| `services.service.spec.ts` | Unitario | CRUD catálogo, soft-delete |
+| `users.service.spec.ts` | Unitario | Perfil de usuario, listado admin |
 
 ---
 
 ## CI/CD — GitHub Actions
 
-El workflow `.github/workflows/ci.yml` se ejecuta en cada push a `master/main/develop` y en Pull Requests:
+El workflow `.github/workflows/ci.yml` se ejecuta en cada push a `master` y en Pull Requests:
 
 ```
-backend job:
+backend job (Node 20):
   ✓ npm ci
   ✓ npx prisma generate
-  ✓ eslint
-  ✓ jest (unit + integration)
+  ✓ eslint --max-warnings 0
+  ✓ jest (55 tests)
   ✓ jest --coverage
-  ✓ nest build
+  ✓ nest build (tsc strict)
 
-frontend job:
+frontend job (Node 20):
   ✓ npm ci
-  ✓ next build
+  ✓ next build + tsc
 
-docker job (after backend + frontend):
-  ✓ docker compose config (valida sintaxis)
+docker job (depende de backend + frontend):
+  ✓ docker compose config (valida sintaxis YAML)
 ```
 
 ---
 
 ## Docker
 
-Los Dockerfiles usan **multi-stage builds**:
+Los Dockerfiles usan **multi-stage builds** (builder → runner) para imágenes mínimas en producción:
 
 ```bash
-# Construir y levantar todos los servicios
+# Construir y levantar todo
 cd infrastructure
 docker compose up --build
 
-# Solo el backend
+# Solo backend
 docker build -f infrastructure/Dockerfile.backend -t harambal-backend backend/
 
-# Solo el frontend
+# Solo frontend
 docker build -f infrastructure/Dockerfile.frontend -t harambal-frontend frontend/
 ```
 
@@ -398,35 +547,37 @@ Healthchecks configurados en compose:
 ### Backend → Railway
 
 1. Conectar el repositorio en Railway
-2. Configurar las variables de entorno en el panel de Railway:
+2. Configurar variables en el panel:
    - `DATABASE_URL` (Railway provisiona PostgreSQL automáticamente)
-   - `JWT_SECRET`
+   - `JWT_SECRET` (64+ chars, generado con `openssl rand -hex 64`)
    - `FRONTEND_URL` (URL de Vercel)
    - `NODE_ENV=production`
-3. Railway detecta el `Dockerfile.backend` automáticamente
+3. Railway detecta `Dockerfile.backend` automáticamente
 
 ### Frontend → Vercel
 
-1. Conectar el repositorio en Vercel, seleccionando `frontend/` como root directory
-2. Configurar variables de entorno en Vercel:
-   - `NEXT_PUBLIC_API_URL=https://<tu-backend>.railway.app/api`
-   - `NEXT_PUBLIC_WS_URL=https://<tu-backend>.railway.app`
+1. Conectar el repositorio; seleccionar `frontend/` como root directory
+2. Configurar variables en Vercel:
+   - `NEXT_PUBLIC_API_URL=https://<app>.railway.app/api`
+   - `NEXT_PUBLIC_WS_URL=https://<app>.railway.app`
 3. Vercel detecta Next.js automáticamente
 
 ---
 
-## Patrones de Diseño
+## Seguridad
 
-| Patrón | Dónde | Por qué |
-|---|---|---|
-| Repository Pattern | `service-requests/repositories/` | Desacopla el acceso a Prisma del servicio |
-| Strategy Pattern | `auth/strategies/jwt.strategy.ts` | Passport-JWT encapsula la estrategia de autenticación |
-| Guard Pattern | `auth/guards/` | Separación entre autenticación y autorización |
-| Decorator Pattern | `auth/decorators/` | `@CurrentUser()` extrae el usuario del request |
-| State Machine | `service-requests.service.ts` | `validTransitions` define transiciones legales de estado |
-| Module Pattern | Toda la aplicación | Encapsulación por dominio en NestJS |
-
-Ver [docs/PATTERNS.md](docs/PATTERNS.md) y [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) para detalles adicionales.
+| Medida | Implementación |
+|---|---|
+| **XSS — token seguro** | JWT en cookie httpOnly vía BFF; JS no puede leerlo |
+| **Password hashing** | bcrypt con salt rounds: 10 |
+| **JWT firmado** | Secreto de mínimo 64 chars, expiración 7 días |
+| **CORS restrictivo** | `FRONTEND_URL` env var; nunca `*` en producción |
+| **Security headers** | Helmet con `contentSecurityPolicy: false` (Next.js gestiona CSP) |
+| **Rate limiting** | ThrottlerGuard global: 10 req / 60 s por IP |
+| **Validación de input** | `ValidationPipe(whitelist: true)` — rechaza propiedades extra |
+| **Errores estructurados** | `GlobalExceptionFilter` — nunca expone stack traces |
+| **Env vars** | `.env` excluido de git; `.env.example` como template |
+| **Prisma P2002/P2025** | Traducidos a 409/404 por el filtro global |
 
 ---
 
@@ -434,21 +585,10 @@ Ver [docs/PATTERNS.md](docs/PATTERNS.md) y [docs/ARCHITECTURE.md](docs/ARCHITECT
 
 | Rol | Capacidades |
 |---|---|
-| `CLIENTE` | Crear solicitudes, ver sus solicitudes, cancelar, calificar servicios |
-| `PROVEEDOR` | Ver solicitudes disponibles, aceptar, cambiar estado (EN_PROCESO, FINALIZADA) |
-| `ADMIN` | Ver todos los usuarios, estadísticas, gestionar catálogo de servicios |
+| `CLIENTE` | Crear solicitudes, ver sus solicitudes, cancelar, calificar servicios finalizados |
+| `PROVEEDOR` | Ver solicitudes disponibles, aceptar, cambiar estado (EN_PROCESO → FINALIZADA) |
+| `ADMIN` | Ver todos los usuarios, estadísticas globales, gestionar catálogo de servicios |
 
 ---
 
-## Seguridad
-
-- Contraseñas hasheadas con **bcrypt** (salt rounds: 10)
-- Tokens JWT firmados con secreto de mínimo 64 caracteres
-- CORS restringido a orígenes configurados (no `*`)
-- WebSocket CORS alineado con la misma política que HTTP
-- `ValidationPipe` con `whitelist: true` — rechaza propiedades no declaradas en DTOs
-- `.env` excluido de git mediante `.gitignore`
-
----
-
-*Desarrollado como proyecto profesional full-stack — listo para revisión académica y portafolio.*
+*Desarrollado como proyecto full-stack de nivel producción — arquitectura enterprise, seguridad hardened, CI/CD completo.*

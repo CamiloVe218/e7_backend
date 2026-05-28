@@ -104,6 +104,10 @@ model ServiceRequest {
   payment  Payment?
   rating   Rating?
 
+  @@index([clientId])
+  @@index([providerId])
+  @@index([status])
+  @@index([createdAt])
   @@map("service_requests")
 }
 
@@ -135,6 +139,8 @@ model Rating {
   client         User           @relation("ClientRatings", fields: [clientId], references: [id])
   provider       Provider       @relation("ProviderRatings", fields: [providerId], references: [id])
 
+  @@index([providerId])
+  @@index([clientId])
   @@map("ratings")
 }
 

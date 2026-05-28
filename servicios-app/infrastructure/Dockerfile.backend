@@ -1,4 +1,4 @@
-# ── Stage 1: dependencies ────────────────────────────────────────────────────
+# ── Stage 1: install all deps + generate Prisma client ───────────────────────
 FROM node:20-alpine AS deps
 WORKDIR /app
 
@@ -7,7 +7,7 @@ RUN apk add --no-cache openssl
 COPY package*.json ./
 RUN npm ci
 
-# ── Stage 2: build ───────────────────────────────────────────────────────────
+# ── Stage 2: build (TypeScript → JS) ─────────────────────────────────────────
 FROM deps AS builder
 WORKDIR /app
 
@@ -15,27 +15,34 @@ COPY . .
 RUN npx prisma generate
 RUN npm run build
 
-# ── Stage 3: production deps only ────────────────────────────────────────────
+# ── Stage 3: production-only deps + Prisma client ────────────────────────────
 FROM node:20-alpine AS prod-deps
 WORKDIR /app
 
 RUN apk add --no-cache openssl
 
 COPY package*.json ./
-# Install production deps + keep prisma CLI (needed for migrate deploy)
-RUN npm ci --omit=dev && \
-    # Prisma CLI must stay for runtime migrations
-    npm install --no-save prisma@$(node -e "console.log(require('./node_modules/prisma/package.json').version)" 2>/dev/null || echo "5")
+COPY prisma ./prisma
 
-# ── Stage 4: production ──────────────────────────────────────────────────────
+# Install production deps only, then add Prisma CLI for migrate deploy
+RUN npm ci --omit=dev && \
+    npm install --no-save "prisma@$(node -e "console.log(require('./node_modules/@prisma/client/package.json').version)")"
+
+# Generate Prisma client against the production deps
+RUN npx prisma generate
+
+# ── Stage 4: production image (minimal) ──────────────────────────────────────
 FROM node:20-alpine AS production
 ENV NODE_ENV=production
 WORKDIR /app
 
 RUN apk add --no-cache openssl
 
+# Copy compiled output from builder
 COPY --from=builder   /app/dist         ./dist
-COPY --from=builder   /app/node_modules ./node_modules
+# Copy production node_modules (no devDeps, includes generated Prisma client)
+COPY --from=prod-deps /app/node_modules ./node_modules
+# Copy prisma schema + migrations (needed for migrate deploy at runtime)
 COPY --from=builder   /app/prisma       ./prisma
 COPY                  package.json      ./package.json
 
