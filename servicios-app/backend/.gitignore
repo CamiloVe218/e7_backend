@@ -12,6 +12,9 @@ coverage/
 prisma/*.js
 prisma/*.js.map
 prisma/*.d.ts
+# Except intentional JS source files (not generated)
+!prisma/safe-migrate.js
+!prisma/seed.js
 
 # entorno
 .env

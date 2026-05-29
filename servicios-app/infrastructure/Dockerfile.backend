@@ -15,7 +15,7 @@ COPY . .
 RUN npx prisma generate
 RUN npm run build
 
-# ── Stage 3: production-only deps + Prisma client ────────────────────────────
+# ── Stage 3: production-only deps ────────────────────────────────────────────
 FROM node:20-alpine AS prod-deps
 WORKDIR /app
 
@@ -24,11 +24,12 @@ RUN apk add --no-cache openssl
 COPY package*.json ./
 COPY prisma ./prisma
 
-# Install production deps only, then add Prisma CLI for migrate deploy
+# Install prod deps — prisma CLI version matched via PRISMA_VERSION shell var
 RUN npm ci --omit=dev && \
-    npm install --no-save "prisma@$(node -e "console.log(require('./node_modules/@prisma/client/package.json').version)")"
+    PRISMA_VERSION=$(node -e "process.stdout.write(require('./node_modules/@prisma/client/package.json').version)") && \
+    npm install --no-save "prisma@${PRISMA_VERSION}"
 
-# Generate Prisma client against the production deps
+# Generate Prisma client for production target
 RUN npx prisma generate
 
 # ── Stage 4: production image (minimal) ──────────────────────────────────────
@@ -38,11 +39,8 @@ WORKDIR /app
 
 RUN apk add --no-cache openssl
 
-# Copy compiled output from builder
 COPY --from=builder   /app/dist         ./dist
-# Copy production node_modules (no devDeps, includes generated Prisma client)
 COPY --from=prod-deps /app/node_modules ./node_modules
-# Copy prisma schema + migrations (needed for migrate deploy at runtime)
 COPY --from=builder   /app/prisma       ./prisma
 COPY                  package.json      ./package.json
 
@@ -51,4 +49,4 @@ EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD wget -qO- http://localhost:4000/api/health || exit 1
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main"]
+CMD ["sh", "-c", "node prisma/safe-migrate.js && node dist/main"]

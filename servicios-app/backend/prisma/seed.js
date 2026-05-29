@@ -1,13 +1,14 @@
-import { PrismaClient, Role } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
+'use strict';
+// Compiled equivalent of seed.ts — kept in sync manually.
+// Run in production with: node prisma/seed.js
+// Run in development with: npm run prisma:seed  (uses ts-node)
+Object.defineProperty(exports, '__esModule', { value: true });
+const client_1 = require('@prisma/client');
+const bcrypt = require('bcrypt');
 
-const prisma = new PrismaClient();
+const prisma = new client_1.PrismaClient();
 
-// Password for all demo accounts. Override via SEED_PASSWORD env var.
-// Never commit a real production password here.
 const PASS = process.env.SEED_PASSWORD || 'Harambal2025!';
-
-// Admin account. Override via SEED_ADMIN_EMAIL env var.
 const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL || 'admin.harambal@gmail.com';
 
 async function main() {
@@ -39,7 +40,7 @@ async function main() {
       email:    ADMIN_EMAIL,
       password: adminHash,
       name:     'Administrador Harambal',
-      role:     Role.ADMIN,
+      role:     client_1.Role.ADMIN,
       phone:    '9512000000',
     },
   });
@@ -59,7 +60,7 @@ async function main() {
     await prisma.user.upsert({
       where:  { email: c.email },
       update: {},
-      create: { email: c.email, password: clienteHash, name: c.name, role: Role.CLIENTE, phone: c.phone },
+      create: { email: c.email, password: clienteHash, name: c.name, role: client_1.Role.CLIENTE, phone: c.phone },
     });
   }
   console.log('✓ Clientes demo creados/verificados');
@@ -67,27 +68,27 @@ async function main() {
   // ── Proveedores demo ──────────────────────────────────────────────────────
   const proveedores = [
     {
-      email: 'juan.plomero.oax@gmail.com',    name: 'Juan Pérez Gómez',
+      email: 'juan.plomero.oax@gmail.com',   name: 'Juan Pérez Gómez',
       phone: '9512200001', bio: 'Plomero certificado con 10 años de experiencia en Oaxaca.',
       serviceType: ['Plomería'], lat: 17.0732, lng: -96.7266, rating: 4.8,
     },
     {
-      email: 'mario.electrico@gmail.com',      name: 'Mario García Ruiz',
+      email: 'mario.electrico@gmail.com',    name: 'Mario García Ruiz',
       phone: '9512200002', bio: 'Electricista industrial con licencia CFE, trabajos de alta y baja tensión.',
       serviceType: ['Electricidad'], lat: 17.0751, lng: -96.7240, rating: 4.6,
     },
     {
-      email: 'ana.limpieza.pro@gmail.com',     name: 'Ana López Reyes',
+      email: 'ana.limpieza.pro@gmail.com',   name: 'Ana López Reyes',
       phone: '9512200003', bio: 'Especialista en limpieza profunda residencial y comercial. Productos ecológicos.',
       serviceType: ['Limpieza'], lat: 17.0710, lng: -96.7290, rating: 4.9,
     },
     {
-      email: 'roberto.pintor@gmail.com',       name: 'Roberto Sánchez',
+      email: 'roberto.pintor@gmail.com',     name: 'Roberto Sánchez',
       phone: '9512200004', bio: 'Pintor con más de 15 años. Interiores, exteriores y acabados decorativos.',
       serviceType: ['Pintura', 'Carpintería'], lat: 17.0695, lng: -96.7310, rating: 4.7,
     },
     {
-      email: 'fernanda.jardineria@gmail.com',  name: 'Fernanda Vásquez',
+      email: 'fernanda.jardineria@gmail.com', name: 'Fernanda Vásquez',
       phone: '9512200005', bio: 'Diseñadora de jardines y experta en plantas nativas de Oaxaca.',
       serviceType: ['Jardinería'], lat: 17.0780, lng: -96.7200, rating: 4.5,
     },
@@ -102,7 +103,7 @@ async function main() {
         email:    p.email,
         password: proveedorHash,
         name:     p.name,
-        role:     Role.PROVEEDOR,
+        role:     client_1.Role.PROVEEDOR,
         phone:    p.phone,
       },
     });
