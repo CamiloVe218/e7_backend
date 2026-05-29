@@ -382,7 +382,7 @@ export function Header() {
               <div className="py-1.5">
                 <button
                   role="menuitem"
-                  onClick={() => { setOpen(false); logout(); }}
+                  onClick={() => { setOpen(false); void logout(); }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:text-red-600 hover:bg-red-50 transition-colors text-left"
                 >
                   <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

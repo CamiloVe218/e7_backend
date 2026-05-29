@@ -18,7 +18,7 @@ interface AuthContextType {
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (data: RegisterPayload) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   loading: boolean;
   refreshUser: () => Promise<void>;
 }
@@ -43,8 +43,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
     setAuthToken(null);
     disconnectSocket();
-    // Fire-and-forget — clears the httpOnly cookie server-side
-    authApi.logout().catch(() => undefined);
   }, []);
 
   const refreshUser = useCallback(async () => {
@@ -88,10 +86,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push('/auth/login?registered=1');
   };
 
-  const logout = () => {
+  const logout = useCallback(async () => {
+    // 1. Clear React state immediately — UI shows logged-out state at once.
     clearAuth();
-    router.push('/auth/login');
-  };
+    // 2. Delete the httpOnly cookie server-side and AWAIT the response.
+    //    The Next.js middleware reads the cookie on every navigation; if we
+    //    navigate before the Set-Cookie: delete arrives, the middleware still
+    //    sees a valid token and bounces the user back to the dashboard.
+    await authApi.logout().catch(() => undefined);
+    // 3. replace (not push) so the back button does not return to the dashboard.
+    router.replace('/auth/login');
+  }, [clearAuth, router]);
 
   return (
     <AuthContext.Provider
