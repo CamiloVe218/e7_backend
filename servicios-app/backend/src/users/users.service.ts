@@ -13,6 +13,12 @@ export class UsersService {
         name: true,
         role: true,
         phone: true,
+        isSuspended: true,
+        street: true,
+        extNumber: true,
+        state: true,
+        city: true,
+        zipCode: true,
         createdAt: true,
         provider: {
           select: {

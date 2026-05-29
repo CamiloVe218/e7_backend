@@ -6,7 +6,7 @@ import { ServiceRequest } from '@/types';
 import { RequestCard } from '@/components/requests/RequestCard';
 import { useSocketEvents } from '@/hooks/useSocket';
 import { useAuth } from '@/contexts/AuthContext';
-import { ToastContainer } from '@/components/ui/Toast';
+import { useToast } from '@/contexts/ToastContext';
 
 function SectionLabel({ children, count }: { children: React.ReactNode; count?: number }) {
   return (
@@ -23,12 +23,21 @@ function Skeleton({ className = 'h-36' }: { className?: string }) {
   return <div className={`${className} skeleton`} />;
 }
 
+function StatPill({ label, value, accent }: { label: string; value: number | string; accent: string }) {
+  return (
+    <div className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl">
+      <span className={`text-lg font-bold tabular-nums font-tight ${accent}`}>{value}</span>
+      <span className="text-xs text-gray-400 leading-tight">{label}</span>
+    </div>
+  );
+}
+
 export default function ProviderDashboard() {
   const { user } = useAuth();
+  const { success, error: toastError, info } = useToast();
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
   const [availLoading, setAvailLoading] = useState(false);
 
@@ -36,8 +45,8 @@ export default function ProviderDashboard() {
     try {
       const reqs = await requestsApi.getAll();
       setRequests(reqs);
-    } catch (err) {
-      console.error(err);
+    } catch {
+      // silent
     } finally {
       setLoading(false);
     }
@@ -58,21 +67,20 @@ export default function ProviderDashboard() {
     try {
       await providersApi.updateProfile({ isAvailable: next });
       setIsAvailable(next);
-      showToast(next ? 'Ahora estás disponible para nuevas solicitudes' : 'Has pausado la recepción de solicitudes');
+      if (next) {
+        success('Ahora estás disponible para nuevas solicitudes');
+      } else {
+        info('Has pausado la recepción de solicitudes');
+      }
     } catch (err: any) {
-      showToast(err.message || 'Error al actualizar disponibilidad');
+      toastError(err.message || 'Error al actualizar disponibilidad');
     } finally {
       setAvailLoading(false);
     }
   };
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 4000);
-  };
-
   useSocketEvents({
-    'request:new':     () => { showToast('Nueva solicitud disponible'); fetchData(); },
+    'request:new':     () => { info('Nueva solicitud disponible'); fetchData(); },
     'request:updated': () => fetchData(),
   });
 
@@ -80,10 +88,10 @@ export default function ProviderDashboard() {
     setActionLoading(true);
     try {
       await requestsApi.accept(id);
-      showToast('Solicitud aceptada correctamente');
+      success('Solicitud aceptada correctamente');
       await fetchData();
     } catch (err: any) {
-      showToast(err.message || 'Error al aceptar la solicitud');
+      toastError(err.message || 'Error al aceptar la solicitud');
     } finally {
       setActionLoading(false);
     }
@@ -95,24 +103,29 @@ export default function ProviderDashboard() {
       await requestsApi.updateStatus(id, status);
       await fetchData();
     } catch (err: any) {
-      showToast(err.message || 'Error al actualizar el estado');
+      toastError(err.message || 'Error al actualizar el estado');
     } finally {
       setActionLoading(false);
     }
   };
 
-  const firstName = user?.name?.split(' ')[0] ?? 'Proveedor';
-  const available = requests.filter(r => r.status === 'PENDIENTE');
-  const myActive  = requests.find(r => ['ACEPTADA', 'EN_PROCESO'].includes(r.status) && r.provider);
+  const firstName   = user?.name?.split(' ')[0] ?? 'Proveedor';
+  const available   = requests.filter(r => r.status === 'PENDIENTE');
+  const myActive    = requests.filter(r => ['ACEPTADA', 'EN_PROCESO'].includes(r.status) && r.provider);
+  const myCompleted = requests.filter(r => r.status === 'FINALIZADA' && r.provider);
+
+  const ratings = myCompleted.filter(r => r.rating).map(r => r.rating!.score);
+  const avgRating = ratings.length > 0
+    ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1)
+    : '—';
 
   return (
     <div className="max-w-5xl mx-auto space-y-10">
 
-      <ToastContainer message={toast} onClose={() => setToast(null)} />
-
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
+          <p className="text-xs font-bold tracking-[0.08em] uppercase text-emerald-600 mb-1">Proveedor</p>
           <h1 className="font-tight text-2xl font-bold text-gray-900 tracking-tight">
             Hola, {firstName}
           </h1>
@@ -147,7 +160,7 @@ export default function ProviderDashboard() {
             onClick={toggleAvailability}
             disabled={availLoading || isAvailable === null}
             aria-label="Alternar disponibilidad"
-            className={`relative w-12 h-6 rounded-full transition-colors duration-300 disabled:opacity-50 shrink-0 focus:outline-none ${
+            className={`relative w-12 h-6 rounded-full transition-colors duration-300 disabled:opacity-50 shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1 ${
               isAvailable ? 'bg-emerald-500' : 'bg-gray-300'
             }`}
           >
@@ -160,17 +173,29 @@ export default function ProviderDashboard() {
         </div>
       </div>
 
-      {/* Active service */}
-      {myActive && (
+      {/* Metrics strip */}
+      {!loading && (
+        <div className="flex gap-2 flex-wrap animate-fade-in">
+          <StatPill label="Activos"      value={myActive.length}    accent="text-emerald-600" />
+          <StatPill label="Completados"  value={myCompleted.length} accent="text-blue-600" />
+          <StatPill label="Calificación" value={avgRating}           accent="text-amber-600" />
+        </div>
+      )}
+
+      {/* Active services */}
+      {myActive.length > 0 && (
         <div>
-          <SectionLabel>Servicio activo</SectionLabel>
-          <div className="max-w-sm">
-            <RequestCard
-              request={myActive}
-              role="PROVEEDOR"
-              onUpdateStatus={handleUpdateStatus}
-              loading={actionLoading}
-            />
+          <SectionLabel count={myActive.length}>Servicios activos</SectionLabel>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {myActive.map(req => (
+              <RequestCard
+                key={req.id}
+                request={req}
+                role="PROVEEDOR"
+                onUpdateStatus={handleUpdateStatus}
+                loading={actionLoading}
+              />
+            ))}
           </div>
         </div>
       )}
@@ -195,7 +220,7 @@ export default function ProviderDashboard() {
             <button
               onClick={toggleAvailability}
               disabled={availLoading}
-              className="mt-1 h-8 px-4 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-40"
+              className="mt-1 h-9 px-4 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-40"
             >
               Activar disponibilidad
             </button>
@@ -223,7 +248,7 @@ export default function ProviderDashboard() {
                 key={req.id}
                 request={req}
                 role="PROVEEDOR"
-                onAccept={myActive ? undefined : handleAccept}
+                onAccept={myActive.length > 0 ? undefined : handleAccept}
                 loading={actionLoading}
               />
             ))}

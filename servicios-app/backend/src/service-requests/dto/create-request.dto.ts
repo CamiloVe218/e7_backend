@@ -1,5 +1,5 @@
 import { IsNumber, IsOptional, IsString, MinLength } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateRequestDto {
@@ -10,10 +10,12 @@ export class CreateRequestDto {
   @ApiProperty({ example: 'Necesito arreglar una gotera en el techo', minLength: 10 })
   @IsString()
   @MinLength(10, { message: 'La descripción debe tener al menos 10 caracteres' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   description: string;
 
   @ApiProperty({ example: 'Av. Reforma 123, Col. Centro' })
   @IsString()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   address: string;
 
   @ApiProperty({ example: 19.4326 })

@@ -14,18 +14,16 @@ export function getSocket(): Socket {
   return socket;
 }
 
-export function connectSocket(userId: string): Socket {
+export function connectSocket(token: string): Socket {
   const s = getSocket();
-
-  if (!s.connected) {
+  // Update auth token — socket.io-client picks this up on the next connect()
+  s.auth = { token };
+  if (s.connected) {
+    s.disconnect();
+    s.connect();
+  } else {
     s.connect();
   }
-
-  s.on('connect', () => {
-    s.emit('register', { userId });
-    console.log('WebSocket conectado:', s.id);
-  });
-
   return s;
 }
 

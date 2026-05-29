@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Prisma, RequestStatus } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 export const REQUEST_INCLUDE = {
   service: true,
@@ -21,7 +21,7 @@ export class ServiceRequestRepository {
     return this.prisma.serviceRequest.create({ data, include: REQUEST_INCLUDE });
   }
 
-  findMany(args: {
+  async findMany(args: {
     where?: Prisma.ServiceRequestWhereInput;
     orderBy?: Prisma.ServiceRequestOrderByWithRelationInput | Prisma.ServiceRequestOrderByWithRelationInput[];
     take?: number;
@@ -34,6 +34,35 @@ export class ServiceRequestRepository {
       take: args.take,
       skip: args.skip,
     });
+  }
+
+  async findManyPaginated(
+    args: {
+      where?: Prisma.ServiceRequestWhereInput;
+      orderBy?: Prisma.ServiceRequestOrderByWithRelationInput | Prisma.ServiceRequestOrderByWithRelationInput[];
+    },
+    page: number,
+    limit: number,
+  ) {
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.prisma.serviceRequest.findMany({
+        where: args.where,
+        include: REQUEST_INCLUDE,
+        orderBy: args.orderBy ?? { createdAt: 'desc' },
+        take: limit,
+        skip,
+      }),
+      this.prisma.serviceRequest.count({ where: args.where }),
+    ]);
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      hasMore: skip + data.length < total,
+    };
   }
 
   findOne(id: string) {

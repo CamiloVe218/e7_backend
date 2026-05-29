@@ -16,6 +16,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { AuthenticatedUser } from '../shared/types/user.types';
 
 @ApiTags('service-requests')
 @ApiBearerAuth()
@@ -28,7 +29,7 @@ export class ServiceRequestsController {
   @Post()
   @UseGuards(RolesGuard)
   @Roles('CLIENTE')
-  create(@CurrentUser() user: any, @Body() dto: CreateRequestDto) {
+  create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateRequestDto) {
     return this.serviceRequestsService.create(user.id, dto);
   }
 
@@ -38,7 +39,7 @@ export class ServiceRequestsController {
   @ApiQuery({ name: 'page', required: false, description: 'Página (requiere limit)' })
   @Get()
   findAll(
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Query('status') status?: string,
     @Query('limit') limit?: string,
     @Query('page') page?: string,
@@ -54,7 +55,7 @@ export class ServiceRequestsController {
 
   @ApiOperation({ summary: 'Historial de solicitudes finalizadas o canceladas' })
   @Get('history')
-  getHistory(@CurrentUser() user: any) {
+  getHistory(@CurrentUser() user: AuthenticatedUser) {
     return this.serviceRequestsService.getHistory(user.id, user.role);
   }
 
@@ -76,7 +77,7 @@ export class ServiceRequestsController {
   @Patch(':id/accept')
   @UseGuards(RolesGuard)
   @Roles('PROVEEDOR')
-  acceptRequest(@Param('id') id: string, @CurrentUser() user: any) {
+  acceptRequest(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.serviceRequestsService.acceptRequest(id, user.id);
   }
 
@@ -84,7 +85,7 @@ export class ServiceRequestsController {
   @Patch(':id/status')
   updateStatus(
     @Param('id') id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdateStatusDto,
   ) {
     return this.serviceRequestsService.updateStatus(id, user.id, dto);

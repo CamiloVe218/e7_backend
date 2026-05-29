@@ -5,6 +5,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { AuthenticatedUser } from '../shared/types/user.types';
 
 @ApiTags('users')
 @ApiBearerAuth()
@@ -15,13 +16,13 @@ export class UsersController {
 
   @ApiOperation({ summary: 'Obtener perfil del usuario autenticado' })
   @Get('me')
-  getMe(@CurrentUser() user: any) {
+  getMe(@CurrentUser() user: AuthenticatedUser) {
     return this.usersService.findOne(user.id);
   }
 
   @ApiOperation({ summary: 'Actualizar nombre o teléfono del usuario autenticado' })
   @Patch('me')
-  updateMe(@CurrentUser() user: any, @Body() body: { name?: string; phone?: string }) {
+  updateMe(@CurrentUser() user: AuthenticatedUser, @Body() body: { name?: string; phone?: string }) {
     return this.usersService.updateMe(user.id, body);
   }
 

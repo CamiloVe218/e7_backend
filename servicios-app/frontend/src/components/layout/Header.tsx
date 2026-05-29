@@ -3,13 +3,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSidebar } from '@/contexts/SidebarContext';
+import { useConnectionStatus } from '@/hooks/useConnectionStatus';
 import { usersApi, authApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-const ROLE_LABEL: Record<string, string> = {
-  CLIENTE: 'Cliente',
-  PROVEEDOR: 'Proveedor',
-  ADMIN: 'Administrador',
+const ROLE_CONFIG: Record<string, { label: string; avatarBg: string; avatarText: string; pill: string }> = {
+  CLIENTE:   { label: 'Cliente',        avatarBg: 'bg-blue-600',   avatarText: 'text-white', pill: 'bg-blue-50 text-blue-700 border-blue-200' },
+  PROVEEDOR: { label: 'Proveedor',      avatarBg: 'bg-emerald-600',avatarText: 'text-white', pill: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  ADMIN:     { label: 'Administrador',  avatarBg: 'bg-violet-600', avatarText: 'text-white', pill: 'bg-violet-50 text-violet-700 border-violet-200' },
 };
 
 function ProfileModal({
@@ -47,17 +48,18 @@ function ProfileModal({
     }
   };
 
-  const fieldBase = "w-full px-3 py-2.5 text-sm rounded-lg border border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 hover:border-gray-300 focus:outline-none focus:border-gray-900 transition-colors";
+  const fieldBase = "w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 hover:border-gray-300 focus:outline-none focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 transition-colors";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-gray-900/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-sm rounded-2xl border border-gray-200 bg-white shadow-xl">
+      <div className="relative w-full max-w-sm rounded-2xl border border-gray-200 bg-white shadow-xl animate-scale-in">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h2 className="text-sm font-semibold text-gray-900">Editar perfil</h2>
           <button
             onClick={onClose}
             className="p-1.5 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+            aria-label="Cerrar"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -90,24 +92,31 @@ function ProfileModal({
             <input
               value={user?.email || ''}
               disabled
-              className="w-full px-3 py-2.5 text-sm rounded-lg border border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed"
+              className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed"
             />
           </div>
 
-          {error && <p className="text-xs text-red-600 px-1">{error}</p>}
+          {error && (
+            <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-red-50 border border-red-100">
+              <svg className="w-3.5 h-3.5 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-xs text-red-600">{error}</p>
+            </div>
+          )}
 
           <div className="flex gap-2 pt-1">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 h-9 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors"
+              className="flex-1 h-10 text-sm font-medium rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 h-9 text-sm font-medium rounded-lg bg-gray-900 hover:bg-gray-800 text-white transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+              className="flex-1 h-10 text-sm font-semibold rounded-xl bg-gray-900 hover:bg-gray-800 text-white transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
             >
               {loading && (
                 <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
@@ -115,7 +124,7 @@ function ProfileModal({
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
               )}
-              Guardar
+              Guardar cambios
             </button>
           </div>
         </form>
@@ -162,7 +171,7 @@ function PasswordConfirmModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={onClose} />
       <div
-        className="relative w-full max-w-sm rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden"
+        className="relative w-full max-w-sm rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden animate-scale-in"
         onClick={e => e.stopPropagation()}
       >
         <div className="px-7 pt-7 pb-5">
@@ -189,7 +198,7 @@ function PasswordConfirmModal({
               placeholder="••••••••"
               autoFocus
               autoComplete="current-password"
-              className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 hover:border-gray-300 focus:outline-none focus:border-gray-900 transition-colors"
+              className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 hover:border-gray-300 focus:outline-none focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 transition-colors"
             />
           </div>
 
@@ -233,10 +242,15 @@ function PasswordConfirmModal({
 export function Header() {
   const { user, logout, refreshUser } = useAuth();
   const { toggle: toggleSidebar } = useSidebar();
+  const connected = useConnectionStatus();
   const [open, setOpen] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  const role = user?.role || 'CLIENTE';
+  const config = ROLE_CONFIG[role] ?? ROLE_CONFIG.CLIENTE;
+  const initial = user?.name?.charAt(0).toUpperCase() ?? '?';
 
   useEffect(() => {
     const fn = (e: MouseEvent) => {
@@ -246,13 +260,19 @@ export function Header() {
     return () => document.removeEventListener('mousedown', fn);
   }, []);
 
+  useEffect(() => {
+    const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('keydown', fn);
+    return () => document.removeEventListener('keydown', fn);
+  }, []);
+
   return (
     <>
       <header className="h-14 shrink-0 flex items-center px-4 lg:px-6 border-b border-gray-200 bg-white gap-2">
-        {/* Hamburger — mobile only */}
+        {/* Mobile hamburger */}
         <button
           onClick={toggleSidebar}
-          className="lg:hidden flex items-center justify-center w-9 h-9 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors shrink-0"
+          className="lg:hidden flex items-center justify-center w-10 h-10 -ml-1.5 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 active:bg-gray-200 transition-colors shrink-0"
           aria-label="Abrir menú de navegación"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -262,23 +282,51 @@ export function Header() {
 
         <div className="flex-1" />
 
+        {/* Connection indicator — desktop only, subtle */}
+        <div className="hidden lg:flex items-center gap-1.5 mr-2">
+          <span className={cn(
+            'relative flex h-2 w-2',
+          )}>
+            {connected && (
+              <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60 animate-ping-slow" />
+            )}
+            <span className={cn(
+              'relative inline-flex rounded-full h-2 w-2',
+              connected ? 'bg-emerald-500' : 'bg-gray-300',
+            )} />
+          </span>
+          <span className="text-[10px] text-gray-400 leading-none">
+            {connected ? 'En línea' : 'Desconectado'}
+          </span>
+        </div>
+
+        {/* User menu */}
         <div className="relative" ref={ref}>
           <button
             onClick={() => setOpen(v => !v)}
+            aria-expanded={open}
+            aria-haspopup="menu"
             className={cn(
-              'flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg transition-colors duration-150',
-              open ? 'bg-gray-100' : 'hover:bg-gray-100',
+              'flex items-center gap-2.5 px-2 py-1.5 rounded-xl transition-colors duration-150 press-effect',
+              open ? 'bg-gray-100' : 'hover:bg-gray-50',
             )}
           >
-            <div className="w-7 h-7 rounded-full bg-gray-900 flex items-center justify-center text-xs font-bold text-white shrink-0 select-none">
-              {user?.name?.charAt(0).toUpperCase()}
+            {/* Avatar */}
+            <div className={cn(
+              'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 select-none',
+              config.avatarBg, config.avatarText,
+            )}>
+              {initial}
             </div>
+
+            {/* Name + role — sm+ only */}
             <div className="text-left hidden sm:block">
               <p className="text-xs font-semibold text-gray-800 leading-tight">{user?.name}</p>
-              <p className="text-[10px] text-gray-400 leading-tight">{ROLE_LABEL[user?.role || ''] || user?.role}</p>
+              <p className="text-[10px] text-gray-400 leading-tight">{config.label}</p>
             </div>
+
             <svg
-              className={cn('w-3.5 h-3.5 text-gray-400 transition-transform duration-150 hidden sm:block', open && 'rotate-180')}
+              className={cn('w-3.5 h-3.5 text-gray-400 transition-transform duration-200 hidden sm:block', open && 'rotate-180')}
               fill="none" viewBox="0 0 24 24" stroke="currentColor"
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -286,14 +334,39 @@ export function Header() {
           </button>
 
           {open && (
-            <div className="absolute right-0 top-full mt-1.5 w-60 rounded-xl border border-gray-200 bg-white shadow-dropdown z-50 overflow-hidden fade-up">
-              <div className="px-4 py-3 border-b border-gray-100">
-                <p className="text-sm font-semibold text-gray-900 truncate">{user?.name}</p>
-                <p className="text-xs text-gray-400 truncate mt-0.5">{user?.email}</p>
-                {user?.phone && <p className="text-xs text-gray-400 mt-0.5">{user.phone}</p>}
+            <div
+              role="menu"
+              className="absolute right-0 top-full mt-2 w-64 rounded-2xl border border-gray-200 bg-white shadow-xl z-50 overflow-hidden animate-fade-up"
+            >
+              {/* User info header */}
+              <div className="px-4 pt-4 pb-3 border-b border-gray-100">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    'w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0',
+                    config.avatarBg, config.avatarText,
+                  )}>
+                    {initial}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{user?.name}</p>
+                    <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+                  </div>
+                </div>
+                {/* Role pill */}
+                <div className="mt-3">
+                  <span className={cn(
+                    'inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border',
+                    config.pill,
+                  )}>
+                    {config.label}
+                  </span>
+                </div>
               </div>
-              <div className="py-1">
+
+              {/* Actions */}
+              <div className="py-1.5">
                 <button
+                  role="menuitem"
                   onClick={() => { setOpen(false); setShowPasswordConfirm(true); }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors text-left"
                 >
@@ -302,8 +375,13 @@ export function Header() {
                   </svg>
                   Editar perfil
                 </button>
-                <div className="h-px bg-gray-100 mx-3 my-1" />
+              </div>
+
+              <div className="h-px bg-gray-100 mx-3" />
+
+              <div className="py-1.5">
                 <button
+                  role="menuitem"
                   onClick={() => { setOpen(false); logout(); }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:text-red-600 hover:bg-red-50 transition-colors text-left"
                 >

@@ -1,12 +1,12 @@
 import {
   WebSocketGateway,
   WebSocketServer,
-  SubscribeMessage,
   OnGatewayInit,
   OnGatewayConnection,
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Logger } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
 
 const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
@@ -33,37 +33,58 @@ export class NotificationsGateway
   server: Server;
 
   private readonly logger = new Logger(NotificationsGateway.name);
-  private userSockets = new Map<string, string>();
+  private userSockets = new Map<string, Set<string>>();
+
+  constructor(private readonly jwtService: JwtService) {}
 
   afterInit(_server: Server) {
     this.logger.log('WebSocket Gateway iniciado');
   }
 
   handleConnection(client: Socket) {
-    this.logger.debug(`Cliente conectado: ${client.id}`);
+    try {
+      const token = client.handshake.auth?.token as string | undefined;
+      if (!token) {
+        client.disconnect();
+        return;
+      }
+      const payload = this.jwtService.verify<{ sub: string }>(token);
+      client.data.userId = payload.sub;
+
+      const sockets = this.userSockets.get(payload.sub) ?? new Set<string>();
+      sockets.add(client.id);
+      this.userSockets.set(payload.sub, sockets);
+
+      this.logger.debug(`Usuario ${payload.sub} conectado (${client.id})`);
+    } catch {
+      client.disconnect();
+    }
   }
 
   handleDisconnect(client: Socket) {
-    this.userSockets.forEach((socketId, userId) => {
-      if (socketId === client.id) {
+    const userId = client.data?.userId as string | undefined;
+    if (!userId) return;
+
+    const sockets = this.userSockets.get(userId);
+    if (sockets) {
+      sockets.delete(client.id);
+      if (sockets.size === 0) {
         this.userSockets.delete(userId);
-        this.logger.debug(`Usuario ${userId} desconectado`);
       }
+    }
+    this.logger.debug(`Usuario ${userId} desconectado (${client.id})`);
+  }
+
+  private emitToUser(userId: string, event: string, payload: unknown) {
+    const sockets = this.userSockets.get(userId);
+    if (!sockets) return;
+    sockets.forEach(socketId => {
+      this.server.to(socketId).emit(event, payload);
     });
   }
 
-  @SubscribeMessage('register')
-  handleRegister(client: Socket, data: { userId: string }) {
-    if (!data?.userId) return;
-    this.userSockets.set(data.userId, client.id);
-    client.emit('registered', { success: true, userId: data.userId });
-  }
-
   notifyUser(userId: string, event: string, data: unknown) {
-    const socketId = this.userSockets.get(userId);
-    if (socketId) {
-      this.server.to(socketId).emit(event, data);
-    }
+    this.emitToUser(userId, event, data);
   }
 
   notifyAll(event: string, data: unknown) {

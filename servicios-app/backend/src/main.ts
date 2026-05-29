@@ -2,11 +2,13 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
+import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './filters/http-exception.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  app.useLogger(app.get(Logger));
 
   app.use(
     helmet({
@@ -58,7 +60,8 @@ async function bootstrap() {
 
   const port = parseInt(process.env.PORT as string, 10) || 4000;
   await app.listen(port, '0.0.0.0');
-  console.log(`Backend corriendo en http://0.0.0.0:${port}/api`);
-  console.log(`Swagger disponible en http://0.0.0.0:${port}/api/docs`);
+  const logger = app.get(Logger);
+  logger.log(`Backend corriendo en http://0.0.0.0:${port}/api`);
+  logger.log(`Swagger disponible en http://0.0.0.0:${port}/api/docs`);
 }
 bootstrap();

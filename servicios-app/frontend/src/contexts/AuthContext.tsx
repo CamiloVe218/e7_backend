@@ -11,13 +11,13 @@ import {
 import { useRouter } from 'next/navigation';
 import { authApi, setAuthToken } from '@/lib/api';
 import { connectSocket, disconnectSocket } from '@/lib/socket';
-import { User } from '@/types';
+import { User, RegisterPayload } from '@/types';
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (data: any) => Promise<void>;
+  register: (data: RegisterPayload) => Promise<void>;
   logout: () => void;
   loading: boolean;
   refreshUser: () => Promise<void>;
@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(userData);
     setToken(tokenValue);
     setAuthToken(tokenValue);
-    connectSocket(userData.id);
+    connectSocket(tokenValue);
   }, []);
 
   const clearAuth = useCallback(() => {
@@ -81,10 +81,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push(getDashboardPath(userData.role));
   };
 
-  const register = async (data: any) => {
-    const { user: userData, token: tokenValue } = await authApi.register(data);
-    setAuth(userData, tokenValue);
-    router.push(getDashboardPath(userData.role));
+  const register = async (data: RegisterPayload) => {
+    // Creates the account but does NOT start a session.
+    // The user must log in explicitly after registration.
+    await authApi.register(data);
+    router.push('/auth/login?registered=1');
   };
 
   const logout = () => {

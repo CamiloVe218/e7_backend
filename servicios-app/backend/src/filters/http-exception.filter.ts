@@ -184,13 +184,23 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       }
     }
 
-    // Status-level fallbacks
+    // For auth-specific messages already in Spanish, pass through directly.
+    // Only apply generic fallbacks when the original is empty or a NestJS default.
+    const isGenericNestDefault = !original ||
+      /^(unauthorized|forbidden|conflict|not found|bad request|internal server error)$/i.test(original.trim());
+
+    if (!isGenericNestDefault && original) {
+      // Message is already specific and meaningful — return as-is
+      return original;
+    }
+
+    // Status-level fallbacks (only reached when original is a generic English default)
     const fallbacks: Record<number, string> = {
-      400: original || 'Solicitud incorrecta. Revisa los datos enviados.',
+      400: 'Solicitud incorrecta. Revisa los datos enviados.',
       401: 'No autorizado. Inicia sesión para continuar.',
       403: 'No tienes permisos para realizar esta acción.',
       404: 'El recurso solicitado no fue encontrado.',
-      409: 'Conflicto: ya existe un registro con esos datos.',
+      409: 'Ya existe un registro con esos datos.',
       422: 'Los datos enviados no son procesables.',
       429: 'Demasiadas solicitudes. Espera unos minutos e intenta de nuevo.',
       500: 'Error interno del servidor. Estamos trabajando en ello.',

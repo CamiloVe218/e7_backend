@@ -15,6 +15,13 @@ export interface User {
   name: string;
   role: Role;
   phone?: string;
+  isSuspended?: boolean;
+  // Address
+  street?: string;
+  extNumber?: string;
+  state?: string;
+  city?: string;
+  zipCode?: string;
   createdAt: string;
   provider?: Provider;
 }
@@ -90,12 +97,57 @@ export interface AuthResponse {
   token: string;
 }
 
+export interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+}
+
+export interface RegisterPayload {
+  name: string;
+  email: string;
+  password: string;
+  role: string;
+  phone?: string;
+  bio?: string;
+  // Address
+  street?: string;
+  extNumber?: string;
+  state?: string;
+  city?: string;
+  zipCode?: string;
+}
+
+export interface RegisterResult {
+  message: string;
+  user: Pick<User, 'id' | 'email' | 'name' | 'role'>;
+}
+
+export interface RequestStats {
+  total: number;
+  pending: number;
+  accepted: number;
+  inProcess: number;
+  completed: number;
+  cancelled: number;
+}
+
+export interface UserStats {
+  total: number;
+  clients: number;
+  providers: number;
+  admins: number;
+}
+
 export interface CreateRequestPayload {
   serviceId: string;
   description: string;
   address: string;
-  lat: number;
-  lng: number;
+  lat?: number;
+  lng?: number;
   scheduledAt?: string;
   price?: number;
+  paymentMethod?: string;
 }

@@ -1,54 +1,73 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { JwtService } from '@nestjs/jwt';
 import { NotificationsGateway } from '../notifications.gateway';
 import { Server, Socket } from 'socket.io';
 
-const mockSocket = {
-  id: 'socket-abc',
-  emit: jest.fn(),
-} as unknown as Socket;
+function makeSocket(id: string, token?: string): Socket {
+  return {
+    id,
+    data: {} as Record<string, unknown>,
+    handshake: { auth: token ? { token } : {} },
+    emit: jest.fn(),
+    disconnect: jest.fn(),
+  } as unknown as Socket;
+}
 
 const mockServer = {
   emit: jest.fn(),
   to: jest.fn().mockReturnThis(),
 } as unknown as Server;
 
+const mockJwtService = {
+  verify: jest.fn(),
+};
+
 describe('NotificationsGateway', () => {
   let gateway: NotificationsGateway;
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    (mockServer.to as jest.Mock).mockReturnThis();
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [NotificationsGateway],
+      providers: [
+        NotificationsGateway,
+        { provide: JwtService, useValue: mockJwtService },
+      ],
     }).compile();
 
     gateway = module.get<NotificationsGateway>(NotificationsGateway);
-    // Inject mock server
     gateway.server = mockServer;
   });
 
-  // ── handleRegister ────────────────────────────────────────────────────────────
+  // ── handleConnection ──────────────────────────────────────────────────────────
 
-  describe('handleRegister', () => {
-    it('maps userId to socketId and emits registered event', () => {
-      gateway.handleRegister(mockSocket, { userId: 'user-1' });
+  describe('handleConnection', () => {
+    it('registers user when JWT is valid', () => {
+      mockJwtService.verify.mockReturnValue({ sub: 'user-1' });
+      const client = makeSocket('socket-abc', 'valid-token');
 
-      expect(mockSocket.emit).toHaveBeenCalledWith('registered', {
-        success: true,
-        userId: 'user-1',
-      });
+      gateway.handleConnection(client);
+
+      expect(client.data.userId).toBe('user-1');
+      expect(client.disconnect).not.toHaveBeenCalled();
     });
 
-    it('does nothing when userId is missing', () => {
-      gateway.handleRegister(mockSocket, { userId: '' });
+    it('disconnects client when no token is provided', () => {
+      const client = makeSocket('socket-abc');
 
-      expect(mockSocket.emit).not.toHaveBeenCalled();
+      gateway.handleConnection(client);
+
+      expect(client.disconnect).toHaveBeenCalled();
     });
 
-    it('does nothing when data is null/undefined', () => {
-      gateway.handleRegister(mockSocket, null as any);
+    it('disconnects client when JWT verification fails', () => {
+      mockJwtService.verify.mockImplementation(() => { throw new Error('invalid'); });
+      const client = makeSocket('socket-abc', 'bad-token');
 
-      expect(mockSocket.emit).not.toHaveBeenCalled();
+      gateway.handleConnection(client);
+
+      expect(client.disconnect).toHaveBeenCalled();
     });
   });
 
@@ -56,20 +75,23 @@ describe('NotificationsGateway', () => {
 
   describe('handleDisconnect', () => {
     it('removes the disconnected socket from userSockets map', () => {
-      // Register first
-      gateway.handleRegister(mockSocket, { userId: 'user-1' });
+      mockJwtService.verify.mockReturnValue({ sub: 'user-1' });
+      const client = makeSocket('socket-abc', 'valid-token');
+      gateway.handleConnection(client);
 
-      // Now disconnect
-      gateway.handleDisconnect(mockSocket);
-
-      // notifyUser should no longer find a socketId
       const emitSpy = jest.fn();
       (mockServer.to as jest.Mock).mockReturnValue({ emit: emitSpy });
 
+      gateway.handleDisconnect(client);
       gateway.notifyUser('user-1', 'test:event', {});
 
-      // server.to() should not be called because socket was removed
       expect(mockServer.to).not.toHaveBeenCalled();
+    });
+
+    it('handles disconnect for unauthenticated clients gracefully', () => {
+      const client = makeSocket('socket-xyz');
+
+      expect(() => gateway.handleDisconnect(client)).not.toThrow();
     });
   });
 
@@ -77,7 +99,9 @@ describe('NotificationsGateway', () => {
 
   describe('notifyUser', () => {
     beforeEach(() => {
-      gateway.handleRegister(mockSocket, { userId: 'user-1' });
+      mockJwtService.verify.mockReturnValue({ sub: 'user-1' });
+      const client = makeSocket('socket-abc', 'valid-token');
+      gateway.handleConnection(client);
       (mockServer.to as jest.Mock).mockReturnValue({ emit: jest.fn() });
     });
 
@@ -94,14 +118,30 @@ describe('NotificationsGateway', () => {
     });
   });
 
-  // ── handleConnection / handleDisconnect lifecycle ────────────────────────────
+  // ── multi-tab: multiple sockets per user ──────────────────────────────────────
 
-  describe('connection lifecycle', () => {
-    it('handleConnection logs the client id without throwing', () => {
-      expect(() => gateway.handleConnection(mockSocket)).not.toThrow();
+  describe('multi-tab support', () => {
+    it('notifies all sockets for a user', () => {
+      mockJwtService.verify.mockReturnValue({ sub: 'user-1' });
+      const clientA = makeSocket('socket-A', 'valid-token');
+      const clientB = makeSocket('socket-B', 'valid-token');
+      gateway.handleConnection(clientA);
+      gateway.handleConnection(clientB);
+
+      const emitSpy = jest.fn();
+      (mockServer.to as jest.Mock).mockReturnValue({ emit: emitSpy });
+
+      gateway.notifyUser('user-1', 'test:event', { x: 1 });
+
+      expect(mockServer.to).toHaveBeenCalledWith('socket-A');
+      expect(mockServer.to).toHaveBeenCalledWith('socket-B');
     });
+  });
 
-    it('afterInit logs gateway started without throwing', () => {
+  // ── lifecycle ─────────────────────────────────────────────────────────────────
+
+  describe('afterInit', () => {
+    it('does not throw', () => {
       expect(() => gateway.afterInit(mockServer)).not.toThrow();
     });
   });

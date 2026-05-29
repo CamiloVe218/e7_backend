@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+import { BACKEND_URL } from '../_backend';
 
 export async function GET(req: NextRequest) {
   const token = req.cookies.get('auth_token')?.value;
@@ -11,7 +10,7 @@ export async function GET(req: NextRequest) {
 
   let railwayRes: Response;
   try {
-    railwayRes = await fetch(`${API_URL}/auth/me`, {
+    railwayRes = await fetch(`${BACKEND_URL}/auth/me`, {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -19,7 +18,7 @@ export async function GET(req: NextRequest) {
     });
   } catch {
     return NextResponse.json(
-      { message: 'Sin conexión al servidor.' },
+      { message: 'No se pudo conectar con el servidor.' },
       { status: 503 },
     );
   }

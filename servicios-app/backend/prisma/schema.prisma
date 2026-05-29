@@ -30,14 +30,21 @@ enum PaymentStatus {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      Role     @default(CLIENTE)
-  phone     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  email       String   @unique
+  password    String
+  name        String
+  role        Role     @default(CLIENTE)
+  phone       String?
+  isSuspended Boolean  @default(false)
+  // Address fields — optional, captured at registration
+  street      String?
+  extNumber   String?
+  state       String?
+  city        String?
+  zipCode     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   provider        Provider?
   serviceRequests ServiceRequest[] @relation("ClientRequests")

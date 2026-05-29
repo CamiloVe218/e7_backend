@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Service } from '@/types';
 import { requestsApi } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   CATALOG,
   CATEGORY_LABELS,
@@ -12,8 +14,6 @@ import {
   getQuantityConfig,
 } from '@/lib/catalog';
 import { formatCurrency } from '@/lib/utils';
-
-const ADDRESS_KEY = 'harambal_user_address';
 
 interface Props {
   isOpen: boolean;
@@ -258,6 +258,8 @@ function CardFormSection({
 // ── Main component ──────────────────────────────────────────────────────────
 
 export function ServiceRequestDrawer({ isOpen, onClose, onSuccess, services, preselectedServiceId }: Props) {
+  const router = useRouter();
+  const { user } = useAuth();
   const [step, setStep] = useState<Step>(1);
   const [sel, setSel] = useState<Selection>(INIT);
   const [loading, setLoading] = useState(false);
@@ -266,12 +268,18 @@ export function ServiceRequestDrawer({ isOpen, onClose, onSuccess, services, pre
   const [card, setCard] = useState<CardForm>(CARD_INIT);
   const [cardErrors, setCardErrors] = useState<Record<keyof CardForm, string>>({ number: '', name: '', cvv: '', expiry: '' });
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
-  // Oaxaca as fallback; updated with real coords when available
-  const [coords, setCoords] = useState({ lat: 17.0669, lng: -96.7203 });
+  const [description, setDescription] = useState('');
 
-  const storedAddress = typeof window !== 'undefined'
-    ? localStorage.getItem(ADDRESS_KEY) || 'Domicilio registrado'
-    : 'Domicilio registrado';
+  // Build the address string from the authenticated user's profile fields
+  const userAddress: string = (() => {
+    if (!user) return '';
+    const parts = [
+      user.street ? `${user.street}${user.extNumber ? ` #${user.extNumber}` : ''}` : '',
+      user.city || '',
+      user.state ? (user.zipCode ? `${user.state} CP ${user.zipCode}` : user.state) : '',
+    ].filter(Boolean);
+    return parts.join(', ');
+  })();
 
   const reset = useCallback(() => {
     if (preselectedServiceId) {
@@ -295,16 +303,13 @@ export function ServiceRequestDrawer({ isOpen, onClose, onSuccess, services, pre
       setCard(CARD_INIT);
       setCardErrors({ number: '', name: '', cvv: '', expiry: '' });
       setShowPaymentOptions(false);
-      // Request real location; keep Oaxaca fallback on denial or timeout
-      if (typeof navigator !== 'undefined' && navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-          () => { /* keep default Oaxaca coords */ },
-          { timeout: 5000, maximumAge: 60_000 },
-        );
-      }
+      setDescription('');
     }
-  }, [isOpen, reset]);
+  // Only react to the drawer opening/closing.
+  // Intentionally omitting `reset` from deps: services changing while the drawer
+  // is already open must NOT re-initialize (that would wipe the success screen).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   const catalog    = sel.serviceKey ? CATALOG[sel.serviceKey] || null : null;
   const categories = catalog ? Object.keys(catalog) : [];
@@ -333,6 +338,10 @@ export function ServiceRequestDrawer({ isOpen, onClose, onSuccess, services, pre
         return `${sel.serviceName} - ${CATEGORY_LABELS[sel.category] || sel.category}: ${item.nombre} (${qPart})`;
       })()
     : '';
+
+  // Pre-fill description whenever the selected item changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (autoDesc) setDescription(autoDesc); }, [autoDesc]);
 
   const handleService  = (svc: Service) => {
     const { key } = getCatalogForService(svc.name);
@@ -364,6 +373,8 @@ export function ServiceRequestDrawer({ isOpen, onClose, onSuccess, services, pre
   const handleSubmit = async () => {
     if (!quantityOk) { setError('Ingresa al menos una cantidad'); return; }
 
+    const serviceAddress = userAddress || 'Sin dirección especificada';
+
     // Card validation path
     if (sel.paymentMethod === 'TARJETA') {
       const errs = validateCard(card);
@@ -373,10 +384,10 @@ export function ServiceRequestDrawer({ isOpen, onClose, onSuccess, services, pre
       setPhase('verifying');
       const apiCall = requestsApi.create({
         serviceId: sel.serviceId,
-        description: autoDesc,
-        address: storedAddress,
-        lat: coords.lat,
-        lng: coords.lng,
+        description: description || autoDesc,
+        address: serviceAddress,
+        lat: 0,
+        lng: 0,
         price: subtotal || undefined,
         paymentMethod: sel.paymentMethod,
       });
@@ -386,7 +397,8 @@ export function ServiceRequestDrawer({ isOpen, onClose, onSuccess, services, pre
         await Promise.all([apiCall, timer]);
         setPhase('payment-success');
         onSuccess();
-        setTimeout(() => setShowPaymentOptions(true), 2000);
+        // Show options immediately — no auto-close, user decides when to leave
+        setShowPaymentOptions(true);
       } catch {
         await timer;
         setPhase('rejected');
@@ -400,20 +412,31 @@ export function ServiceRequestDrawer({ isOpen, onClose, onSuccess, services, pre
     try {
       await requestsApi.create({
         serviceId: sel.serviceId,
-        description: autoDesc,
-        address: storedAddress,
-        lat: coords.lat,
-        lng: coords.lng,
+        description: description || autoDesc,
+        address: serviceAddress,
+        lat: 0,
+        lng: 0,
         price: subtotal || undefined,
         paymentMethod: sel.paymentMethod,
       });
       setPhase('success');
       onSuccess();
-    } catch (err: any) {
-      setError(err.message || 'Error al crear la solicitud');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al crear la solicitud';
+      setError(msg);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Navigate to appropriate dashboard and close drawer
+  const goToDashboard = () => {
+    onClose();
+    const path =
+      user?.role === 'PROVEEDOR' ? '/dashboard/provider' :
+      user?.role === 'ADMIN'     ? '/dashboard/admin'    :
+                                   '/dashboard/client';
+    router.push(path);
   };
 
   if (!isOpen) return null;
@@ -513,6 +536,12 @@ export function ServiceRequestDrawer({ isOpen, onClose, onSuccess, services, pre
               <div className="h-px bg-gray-100" />
               <div className="px-7 py-5 flex flex-col gap-2.5">
                 <button
+                  onClick={goToDashboard}
+                  className="w-full h-11 text-sm font-bold rounded-xl bg-gray-900 hover:bg-gray-800 text-white transition-colors"
+                >
+                  Menú principal
+                </button>
+                <button
                   onClick={() => {
                     setShowPaymentOptions(false);
                     setPhase('form');
@@ -520,16 +549,11 @@ export function ServiceRequestDrawer({ isOpen, onClose, onSuccess, services, pre
                     setStep(1);
                     setCard(CARD_INIT);
                     setCardErrors({ number: '', name: '', cvv: '', expiry: '' });
+                    setDescription('');
                   }}
                   className="w-full h-11 text-sm font-semibold rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors"
                 >
-                  Continuar solicitando servicios
-                </button>
-                <button
-                  onClick={() => { setShowPaymentOptions(false); setPhase('thankyou'); }}
-                  className="w-full h-11 text-sm font-bold rounded-xl bg-gray-900 hover:bg-gray-800 text-white transition-colors"
-                >
-                  Volver al menú principal
+                  Continuar solicitando
                 </button>
               </div>
             </div>
@@ -556,7 +580,7 @@ export function ServiceRequestDrawer({ isOpen, onClose, onSuccess, services, pre
             Tu solicitud está en camino.<br />Esperamos verte pronto.
           </p>
           <button
-            onClick={onClose}
+            onClick={goToDashboard}
             className="h-12 px-10 text-sm font-bold rounded-xl bg-gray-900 hover:bg-gray-800 text-white transition-colors"
           >
             Volver al inicio
@@ -622,7 +646,7 @@ export function ServiceRequestDrawer({ isOpen, onClose, onSuccess, services, pre
                 { label: 'Trabajo',        value: item?.nombre },
                 qtyConfig?.multiFields ? null : { label: 'Cantidad', value: `${sel.quantity} ${qtyConfig?.unit}` },
                 { label: 'Método de pago', value: payLabel },
-                { label: 'Ubicación',      value: storedAddress },
+                { label: 'Ubicación',      value: userAddress || 'Sin dirección especificada' },
               ].filter(Boolean).map((row, i) => row && (
                 <div key={i} className="flex items-start justify-between px-4 py-2.5 border-b border-gray-100 last:border-0">
                   <span className="text-xs text-gray-400 shrink-0 w-28">{row.label}</span>
@@ -641,18 +665,18 @@ export function ServiceRequestDrawer({ isOpen, onClose, onSuccess, services, pre
               </div>
             </div>
 
-            <div className="flex gap-3 w-full max-w-sm">
+            <div className="flex flex-col gap-2.5 w-full max-w-sm">
               <button
-                onClick={() => { setPhase('form'); setSel(INIT); setStep(1); setError(''); setCard(CARD_INIT); }}
-                className="flex-1 h-10 text-sm font-semibold rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors"
+                onClick={goToDashboard}
+                className="w-full h-11 text-sm font-bold rounded-xl bg-gray-900 hover:bg-gray-800 text-white transition-colors"
               >
-                Pedir más
+                Menú principal
               </button>
               <button
-                onClick={onClose}
-                className="flex-1 h-10 text-sm font-semibold rounded-xl bg-gray-900 hover:bg-gray-800 text-white transition-colors"
+                onClick={() => { setPhase('form'); setSel(INIT); setStep(1); setError(''); setCard(CARD_INIT); setDescription(''); }}
+                className="w-full h-11 text-sm font-semibold rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors"
               >
-                Continuar
+                Continuar solicitando
               </button>
             </div>
           </div>
@@ -806,23 +830,40 @@ export function ServiceRequestDrawer({ isOpen, onClose, onSuccess, services, pre
               )}
             </div>
 
-            {/* Address indicator (read-only) */}
+            {/* Address — from user profile, read-only */}
             <div>
               <p className={`${OVERLINE} mb-2`}>Dirección del servicio</p>
-              <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-white border border-gray-200 text-xs text-gray-600">
-                <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                <span className="truncate">{storedAddress}</span>
-              </div>
+              {userAddress ? (
+                <div className="flex items-start gap-3 px-4 py-3.5 rounded-xl bg-gray-50 border border-gray-200">
+                  <svg className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <p className="text-sm text-gray-800 leading-relaxed">{userAddress}</p>
+                </div>
+              ) : (
+                <div className="flex items-start gap-3 px-4 py-3.5 rounded-xl bg-amber-50 border border-amber-100">
+                  <svg className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-xs text-amber-800 leading-relaxed">
+                    No tienes dirección registrada en tu perfil. El servicio se coordinará directamente con el proveedor.
+                  </p>
+                </div>
+              )}
             </div>
 
-            {/* Auto-description */}
-            {autoDesc && (
+            {/* Editable description */}
+            {(description || autoDesc) && (
               <div>
-                <p className={`${OVERLINE} mb-2`}>Descripción generada</p>
-                <p className="text-xs text-gray-500 leading-relaxed bg-white border border-gray-200 rounded-xl px-3.5 py-2.5">{autoDesc}</p>
+                <label className={`${OVERLINE} mb-2 block`}>Descripción del servicio</label>
+                <textarea
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  rows={3}
+                  placeholder="Describe los detalles del servicio..."
+                  className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-gray-900 focus:shadow-[0_0_0_3px_rgba(17,17,17,0.07)] transition-all resize-none"
+                />
               </div>
             )}
 
@@ -841,7 +882,7 @@ export function ServiceRequestDrawer({ isOpen, onClose, onSuccess, services, pre
 
       {/* Footer — step 4 only */}
       {phase === 'form' && step === 4 && (
-        <div className="shrink-0 border-t border-gray-200 bg-white px-6 py-4">
+        <div className="shrink-0 border-t border-gray-200 bg-white px-6 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <div className="flex items-center justify-between mb-3">
             <div className="space-y-0.5">
               <p className="text-xs font-semibold text-gray-800">{sel.serviceName}</p>

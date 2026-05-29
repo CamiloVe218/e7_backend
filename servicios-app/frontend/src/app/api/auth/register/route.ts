@@ -1,38 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+import { BACKEND_URL } from '../_backend';
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
 
-  let railwayRes: Response;
+  let backendRes: Response;
   try {
-    railwayRes = await fetch(`${API_URL}/auth/register`, {
+    backendRes = await fetch(`${BACKEND_URL}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
   } catch {
     return NextResponse.json(
-      { message: 'Sin conexión al servidor. Intenta de nuevo.' },
+      { message: 'No se pudo conectar con el servidor. Verifica tu conexión.' },
       { status: 503 },
     );
   }
 
-  const data = await railwayRes.json();
+  const data = await backendRes.json();
 
-  if (!railwayRes.ok) {
-    return NextResponse.json(data, { status: railwayRes.status });
+  if (!backendRes.ok) {
+    return NextResponse.json(data, { status: backendRes.status });
   }
 
-  const res = NextResponse.json(data);
-  res.cookies.set('auth_token', data.token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 7 * 24 * 60 * 60,
-    path: '/',
+  // Registration succeeds — return user info but DO NOT set the auth cookie.
+  // The user must explicitly log in after creating their account.
+  return NextResponse.json({
+    message: 'Usuario creado correctamente',
+    user: data.user,
   });
-
-  return res;
 }

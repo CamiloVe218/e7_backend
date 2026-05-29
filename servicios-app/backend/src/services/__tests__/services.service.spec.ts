@@ -92,11 +92,11 @@ describe('ServicesService', () => {
 
   describe('create', () => {
     it('delegates creation to prisma with provided data', async () => {
-      const data = { name: 'Jardín', category: 'HOGAR', basePrice: 300, isActive: true };
+      const data = { name: 'Jardín', description: 'Servicio de jardinería', category: 'HOGAR', basePrice: 300, isActive: true };
       const created = { id: 'new-1', ...data };
       mockPrisma.service.create.mockResolvedValue(created);
 
-      const result = await service.create(data);
+      const result = await service.create(data as any);
 
       expect(result).toEqual(created);
       expect(mockPrisma.service.create).toHaveBeenCalledWith({ data });
@@ -110,7 +110,7 @@ describe('ServicesService', () => {
       const updated = { id: 's1', name: 'Plomería Pro', basePrice: 500 };
       mockPrisma.service.update.mockResolvedValue(updated);
 
-      const result = await service.update('s1', { name: 'Plomería Pro', basePrice: 500 });
+      const result = await service.update('s1', { name: 'Plomería Pro', basePrice: 500 } as any);
 
       expect(result).toEqual(updated);
       expect(mockPrisma.service.update).toHaveBeenCalledWith({

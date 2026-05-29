@@ -5,12 +5,14 @@ import { useRouter } from 'next/navigation';
 import { ServiceRequest } from '@/types';
 import { StatusBadge } from '@/components/ui/Badge';
 import { formatCurrency, formatDateShort, STATUS_DOT } from '@/lib/utils';
+import { PostServiceModal } from './PostServiceModal';
 
 interface RequestCardProps {
   request: ServiceRequest;
   role: string;
   onAccept?: (id: string) => void;
   onUpdateStatus?: (id: string, status: string) => void;
+  onRateComplete?: () => void; // refresh after rating/payment
   loading?: boolean;
 }
 
@@ -53,22 +55,14 @@ function CancelModal({
           </h3>
 
           <p className="text-sm text-gray-600 leading-relaxed">
-            Esta solicitud será cancelada.
+            Esta solicitud será cancelada y el proveedor será notificado de inmediato.
           </p>
 
-          {/* Payment-specific charge notice */}
-          <div className={`mt-4 px-4 py-3.5 rounded-xl border text-sm leading-relaxed ${isCard ? 'bg-red-50 border-red-100 text-red-700' : 'bg-amber-50 border-amber-100 text-amber-800'}`}>
-            {isCard ? (
-              <>
-                <span className="font-semibold">Cargo por cancelación:</span> Se realizará un cargo de{' '}
-                <span className="font-semibold">$100 MXN</span> a tu método de pago registrado.
-              </>
-            ) : (
-              <>
-                <span className="font-semibold">Cargo por cancelación:</span> Se agregará un cargo adicional de{' '}
-                <span className="font-semibold">$100 MXN</span> en tu próximo pedido realizado en efectivo.
-              </>
-            )}
+          {/* Cancellation notice */}
+          <div className="mt-4 px-4 py-3.5 rounded-xl border bg-amber-50 border-amber-100 text-amber-800 text-sm leading-relaxed">
+            {isCard
+              ? 'Si ya se procesó un pago, el reembolso puede tardar entre 3 y 5 días hábiles.'
+              : 'El proveedor será notificado de la cancelación de inmediato.'}
           </div>
         </div>
 
@@ -93,7 +87,7 @@ function CancelModal({
   );
 }
 
-// ── Completion modal ────────────────────────────────────────────────────────
+// ── Completion modal (PROVEEDOR) ─────────────────────────────────────────────
 
 function CompletionModal({
   onContinue,
@@ -146,13 +140,12 @@ function CompletionModal({
   );
 }
 
-// ── Thank you screen ────────────────────────────────────────────────────────
+// ── Thank you screen (PROVEEDOR) ─────────────────────────────────────────────
 
 function ThankYouScreen({ onReturn }: { onReturn: () => void }) {
   return (
     <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white px-8">
       <div className="flex flex-col items-center text-center max-w-sm">
-        {/* Large logo */}
         <div className="w-24 h-24 rounded-3xl bg-gray-900 flex items-center justify-center mb-8 shadow-xl">
           <svg viewBox="0 0 20 20" fill="currentColor" className="w-12 h-12 text-white">
             <path d="M3 8h11l4 2-4 2H3a1 1 0 01-1-1V9a1 1 0 011-1z" />
@@ -165,11 +158,11 @@ function ThankYouScreen({ onReturn }: { onReturn: () => void }) {
         </h1>
 
         <p className="font-tight text-2xl font-bold text-gray-800 mb-4 leading-snug">
-          ¡Gracias por usar Harambal!
+          ¡Gracias por tu trabajo!
         </p>
 
         <p className="text-sm text-gray-500 leading-relaxed mb-12">
-          Tu servicio ha sido completado exitosamente.<br />
+          El servicio ha sido completado exitosamente.<br />
           Esperamos verte pronto.
         </p>
 
@@ -186,12 +179,25 @@ function ThankYouScreen({ onReturn }: { onReturn: () => void }) {
 
 // ── Main component ──────────────────────────────────────────────────────────
 
-export function RequestCard({ request, role, onAccept, onUpdateStatus, loading }: RequestCardProps) {
+function Spinner() {
+  return (
+    <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+    </svg>
+  );
+}
+
+export function RequestCard({ request, role, onAccept, onUpdateStatus, onRateComplete, loading }: RequestCardProps) {
   const router = useRouter();
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [showThankYou, setShowThankYou] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [showPostService, setShowPostService] = useState(false);
+  const [isBusy, setIsBusy] = useState(false);
+
+  const isFinalized   = request.status === 'FINALIZADA';
+  const alreadyRated  = !!request.rating;
 
   const canAccept  = role === 'PROVEEDOR' && request.status === 'PENDIENTE' && onAccept;
   const canStart   = role === 'PROVEEDOR' && request.status === 'ACEPTADA'  && onUpdateStatus;
@@ -200,41 +206,53 @@ export function RequestCard({ request, role, onAccept, onUpdateStatus, loading }
     role === 'CLIENTE' &&
     ['PENDIENTE', 'ACEPTADA', 'EN_PROCESO'].includes(request.status) &&
     onUpdateStatus;
-  const hasActions = canAccept || canStart || canFinish || canCancel;
+  // Show pay+rate button for finalized services that haven't been rated yet
+  const canPayRate = role === 'CLIENTE' && isFinalized && !alreadyRated;
+  const hasActions = canAccept || canStart || canFinish || canCancel || canPayRate;
 
   const handleConfirmCancel = async () => {
     setShowCancelModal(false);
-    setActionLoading(true);
+    setIsBusy(true);
     try {
       await onUpdateStatus!(request.id, 'CANCELADA');
     } finally {
-      setActionLoading(false);
+      setIsBusy(false);
     }
   };
 
-  const handleFinalize = () => {
-    setShowCompletionModal(true);
+  const handleAccept = async () => {
+    if (!onAccept) return;
+    setIsBusy(true);
+    try { await onAccept(request.id); } finally { setIsBusy(false); }
   };
+
+  const handleStart = async () => {
+    if (!onUpdateStatus) return;
+    setIsBusy(true);
+    try { await onUpdateStatus(request.id, 'EN_PROCESO'); } finally { setIsBusy(false); }
+  };
+
+  const handleFinalize = () => setShowCompletionModal(true);
 
   const handleCompletionContinue = async () => {
     setShowCompletionModal(false);
-    setActionLoading(true);
+    setIsBusy(true);
     try {
       await onUpdateStatus!(request.id, 'FINALIZADA');
     } finally {
-      setActionLoading(false);
+      setIsBusy(false);
     }
   };
 
   const handleCompletionExit = async () => {
     setShowCompletionModal(false);
-    setActionLoading(true);
+    setIsBusy(true);
     try {
       await onUpdateStatus!(request.id, 'FINALIZADA');
+      setShowThankYou(true);
     } finally {
-      setActionLoading(false);
+      setIsBusy(false);
     }
-    setShowThankYou(true);
   };
 
   const handleReturnHome = () => {
@@ -242,10 +260,15 @@ export function RequestCard({ request, role, onAccept, onUpdateStatus, loading }
     router.push('/dashboard/provider');
   };
 
+  const handlePostServiceComplete = () => {
+    setShowPostService(false);
+    onRateComplete?.();
+  };
+
   return (
     <>
       <div className="bg-white rounded-xl border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all duration-200 ease-premium overflow-hidden shadow-card group">
-        {/* Status accent */}
+        {/* Status accent bar */}
         <div className={`h-[3px] w-full ${STATUS_DOT[request.status as keyof typeof STATUS_DOT]}`} />
 
         <div className="p-5">
@@ -302,6 +325,16 @@ export function RequestCard({ request, role, onAccept, onUpdateStatus, loading }
                 <span>{request.provider.user?.name}</span>
               </div>
             )}
+
+            {/* Already rated badge */}
+            {isFinalized && alreadyRated && request.rating && (
+              <div className="flex items-center gap-2 text-xs text-amber-600">
+                <svg className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                </svg>
+                <span>Calificado: {request.rating.score}/5</span>
+              </div>
+            )}
           </div>
 
           {/* Actions */}
@@ -309,36 +342,48 @@ export function RequestCard({ request, role, onAccept, onUpdateStatus, loading }
             <div className="flex items-center gap-2 mt-4 pt-3.5 border-t border-gray-100">
               {canAccept && (
                 <button
-                  onClick={() => onAccept!(request.id)}
-                  disabled={loading || actionLoading}
-                  className="flex-1 h-8 text-xs font-semibold rounded-lg bg-gray-900 hover:bg-gray-800 active:scale-[0.97] text-white transition-all disabled:opacity-40"
+                  onClick={handleAccept}
+                  disabled={loading || isBusy}
+                  className="flex-1 h-11 text-xs font-semibold rounded-lg bg-gray-900 hover:bg-gray-800 active:scale-[0.97] text-white transition-all disabled:opacity-40 flex items-center justify-center gap-1.5"
                 >
+                  {isBusy ? <Spinner /> : null}
                   Aceptar
                 </button>
               )}
               {canStart && (
                 <button
-                  onClick={() => onUpdateStatus!(request.id, 'EN_PROCESO')}
-                  disabled={loading || actionLoading}
-                  className="flex-1 h-8 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] text-white transition-all disabled:opacity-40"
+                  onClick={handleStart}
+                  disabled={loading || isBusy}
+                  className="flex-1 h-11 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] text-white transition-all disabled:opacity-40 flex items-center justify-center gap-1.5"
                 >
+                  {isBusy ? <Spinner /> : null}
                   Iniciar servicio
                 </button>
               )}
               {canFinish && (
                 <button
                   onClick={handleFinalize}
-                  disabled={loading || actionLoading}
-                  className="flex-1 h-8 text-xs font-semibold rounded-lg bg-gray-900 hover:bg-gray-800 active:scale-[0.97] text-white transition-all disabled:opacity-40"
+                  disabled={loading || isBusy}
+                  className="flex-1 h-11 text-xs font-semibold rounded-lg bg-gray-900 hover:bg-gray-800 active:scale-[0.97] text-white transition-all disabled:opacity-40 flex items-center justify-center gap-1.5"
                 >
+                  {isBusy ? <Spinner /> : null}
                   Finalizar
+                </button>
+              )}
+              {canPayRate && (
+                <button
+                  onClick={() => setShowPostService(true)}
+                  disabled={loading || isBusy}
+                  className="flex-1 h-11 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] text-white transition-all disabled:opacity-40 flex items-center justify-center gap-1.5"
+                >
+                  Pagar y calificar
                 </button>
               )}
               {canCancel && (
                 <button
                   onClick={() => setShowCancelModal(true)}
-                  disabled={loading || actionLoading}
-                  className="h-8 px-3 text-xs font-medium rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50 border border-red-100 hover:border-red-200 transition-all disabled:opacity-40"
+                  disabled={loading || isBusy}
+                  className="h-11 px-4 text-xs font-medium rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50 border border-red-100 hover:border-red-200 transition-all disabled:opacity-40"
                 >
                   Cancelar
                 </button>
@@ -365,6 +410,14 @@ export function RequestCard({ request, role, onAccept, onUpdateStatus, loading }
       )}
 
       {showThankYou && <ThankYouScreen onReturn={handleReturnHome} />}
+
+      {showPostService && (
+        <PostServiceModal
+          request={request}
+          onComplete={handlePostServiceComplete}
+          onClose={() => setShowPostService(false)}
+        />
+      )}
     </>
   );
 }

@@ -74,6 +74,8 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
       NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL}
+      # Server-side URL for BFF routes — uses internal Docker network
+      BACKEND_URL: http://backend:4000/api
     ports:
       - "3000:3000"
     depends_on:

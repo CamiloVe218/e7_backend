@@ -2,22 +2,24 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/contexts/ToastContext';
 import { requestsApi, servicesApi } from '@/lib/api';
 import { ServiceRequest, Service } from '@/types';
 import { RequestCard } from '@/components/requests/RequestCard';
 import { ServiceRequestDrawer } from '@/components/requests/ServiceRequestDrawer';
 
 const FILTERS = [
-  { label: 'Todas',      value: '' },
-  { label: 'Pendientes', value: 'PENDIENTE' },
-  { label: 'Aceptadas',  value: 'ACEPTADA' },
-  { label: 'En proceso', value: 'EN_PROCESO' },
+  { label: 'Todas',       value: '' },
+  { label: 'Pendientes',  value: 'PENDIENTE' },
+  { label: 'Aceptadas',   value: 'ACEPTADA' },
+  { label: 'En proceso',  value: 'EN_PROCESO' },
   { label: 'Finalizadas', value: 'FINALIZADA' },
-  { label: 'Canceladas', value: 'CANCELADA' },
+  { label: 'Canceladas',  value: 'CANCELADA' },
 ];
 
 export default function RequestsPage() {
   const { user } = useAuth();
+  const { error: toastError } = useToast();
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,8 +31,8 @@ export default function RequestsPage() {
     try {
       const reqs = await requestsApi.getAll(activeFilter || undefined);
       setRequests(reqs);
-    } catch (err) {
-      console.error(err);
+    } catch {
+      // silent — user stays on stale data
     } finally {
       setLoading(false);
     }
@@ -38,7 +40,7 @@ export default function RequestsPage() {
 
   useEffect(() => { fetchRequests(); }, [fetchRequests]);
   useEffect(() => {
-    servicesApi.getAll().then(svcs => setServices(svcs as Service[])).catch(console.error);
+    servicesApi.getAll().then(svcs => setServices(svcs as Service[])).catch(() => {});
   }, []);
 
   const handleUpdateStatus = async (id: string, status: string) => {
@@ -47,7 +49,7 @@ export default function RequestsPage() {
       await requestsApi.updateStatus(id, status);
       await fetchRequests();
     } catch (err: any) {
-      console.error(err.message);
+      toastError(err.message || 'Error al actualizar el estado');
     } finally {
       setActionLoading(false);
     }
@@ -67,7 +69,7 @@ export default function RequestsPage() {
         {user?.role === 'CLIENTE' && (
           <button
             onClick={() => setDrawerOpen(true)}
-            className="flex items-center gap-2 h-9 px-4 text-sm font-semibold rounded-xl bg-gray-900 hover:bg-gray-800 text-white transition-colors"
+            className="flex items-center gap-2 h-9 px-4 text-sm font-semibold rounded-xl bg-gray-900 hover:bg-gray-800 active:scale-[0.97] text-white transition-all"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
@@ -85,7 +87,7 @@ export default function RequestsPage() {
             onClick={() => { setActiveFilter(f.value); setLoading(true); }}
             className={`h-8 px-3 text-xs font-semibold rounded-lg transition-all duration-150 active:scale-[0.96] ${
               activeFilter === f.value
-                ? 'bg-gray-900 text-white shadow-xs'
+                ? 'bg-gray-900 text-white'
                 : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-gray-800'
             }`}
           >
@@ -125,6 +127,7 @@ export default function RequestsPage() {
               request={req}
               role={user?.role || 'CLIENTE'}
               onUpdateStatus={handleUpdateStatus}
+              onRateComplete={fetchRequests}
               loading={actionLoading}
             />
           ))}

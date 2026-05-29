@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { AuthenticatedUser } from '../shared/types/user.types';
 
 @Injectable()
 export class AuthService {
@@ -29,18 +30,28 @@ export class AuthService {
 
     const user = await this.prisma.user.create({
       data: {
-        email: dto.email,
-        password: hashedPassword,
-        name: dto.name,
-        role: (dto.role as any) || 'CLIENTE',
-        phone: dto.phone,
+        email:     dto.email,
+        password:  hashedPassword,
+        name:      dto.name,
+        role:      dto.role ?? 'CLIENTE',
+        phone:     dto.phone,
+        street:    dto.street,
+        extNumber: dto.extNumber,
+        state:     dto.state,
+        city:      dto.city,
+        zipCode:   dto.zipCode,
       },
       select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        phone: true,
+        id:        true,
+        email:     true,
+        name:      true,
+        role:      true,
+        phone:     true,
+        street:    true,
+        extNumber: true,
+        state:     true,
+        city:      true,
+        zipCode:   true,
         createdAt: true,
       },
     });
@@ -73,12 +84,16 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
+    if (user.isSuspended) {
+      throw new UnauthorizedException('Tu cuenta ha sido suspendida. Contacta al soporte.');
+    }
+
     const { password, ...userWithoutPassword } = user;
     const token = this.generateToken(userWithoutPassword);
     return { user: userWithoutPassword, token };
   }
 
-  private generateToken(user: any) {
+  private generateToken(user: Pick<AuthenticatedUser, 'id' | 'email' | 'role'>) {
     return this.jwtService.sign({
       sub: user.id,
       email: user.email,

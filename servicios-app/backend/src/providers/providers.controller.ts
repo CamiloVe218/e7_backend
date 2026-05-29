@@ -3,6 +3,8 @@ import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestj
 import { ProvidersService } from './providers.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { AuthenticatedUser } from '../shared/types/user.types';
+import { UpdateProviderProfileDto } from './dto/update-provider-profile.dto';
 
 @ApiTags('providers')
 @ApiBearerAuth()
@@ -30,7 +32,7 @@ export class ProvidersController {
 
   @ApiOperation({ summary: 'Obtener perfil del proveedor autenticado' })
   @Get('profile')
-  getMyProfile(@CurrentUser() user: any) {
+  getMyProfile(@CurrentUser() user: AuthenticatedUser) {
     return this.providersService.findByUserId(user.id);
   }
 
@@ -43,7 +45,7 @@ export class ProvidersController {
 
   @ApiOperation({ summary: 'Actualizar perfil del proveedor autenticado' })
   @Patch('profile')
-  updateProfile(@CurrentUser() user: any, @Body() body: any) {
+  updateProfile(@CurrentUser() user: AuthenticatedUser, @Body() body: UpdateProviderProfileDto) {
     return this.providersService.updateProfile(user.id, body);
   }
 }

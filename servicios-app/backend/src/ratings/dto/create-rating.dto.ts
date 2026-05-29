@@ -1,4 +1,5 @@
 import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateRatingDto {
@@ -15,5 +16,6 @@ export class CreateRatingDto {
   @ApiPropertyOptional({ example: 'Excelente trabajo, muy puntual y profesional.' })
   @IsOptional()
   @IsString()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   comment?: string;
 }

@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { AuthenticatedUser } from '../shared/types/user.types';
 
 @ApiTags('ratings')
 @ApiBearerAuth()
@@ -18,7 +19,7 @@ export class RatingsController {
   @Post()
   @UseGuards(RolesGuard)
   @Roles('CLIENTE')
-  create(@CurrentUser() user: any, @Body() dto: CreateRatingDto) {
+  create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateRatingDto) {
     return this.ratingsService.create(user.id, dto);
   }
 
