@@ -16,11 +16,14 @@
 const { execSync } = require('child_process');
 const { PrismaClient } = require('@prisma/client');
 
-// Migrations in chronological order — must stay in sync with the migrations/ directory.
-const KNOWN_MIGRATIONS = [
+// Migrations to baseline on existing DBs without migration history.
+// Only include migrations whose DDL is guaranteed to already be in the DB
+// (created via prisma db push with an older schema).
+// Migrations that add NEW columns (like 0001, 0002) are intentionally excluded
+// from this list so prisma migrate deploy actually runs their SQL.
+const BASELINE_MIGRATIONS = [
   '20260101000000_init',
   '20260528000000_add_indexes',
-  '20260529000001_add_user_fields',
 ];
 
 async function detectState(prisma) {
@@ -59,8 +62,8 @@ async function main() {
 
   if (hasTables && !hasMigrations) {
     console.log('[safe-migrate] Existing schema without migration history detected.');
-    console.log('[safe-migrate] Baselining known migrations as already applied...');
-    for (const migration of KNOWN_MIGRATIONS) {
+    console.log('[safe-migrate] Baselining structural migrations (additive migrations will run)...');
+    for (const migration of BASELINE_MIGRATIONS) {
       run(`npx prisma migrate resolve --applied ${migration}`);
     }
     console.log('[safe-migrate] Baseline complete.');
