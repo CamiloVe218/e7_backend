@@ -33,8 +33,11 @@ export default function HistoryPage() {
   useEffect(() => { fetchHistory(); }, [fetchHistory]);
 
   const base = filter ? history.filter(r => r.status === filter) : history;
-  // FINALIZADA without a rating still needs the pay+rate flow — keep it in the active view only
-  const displayed = base.filter(r => r.status !== 'FINALIZADA' || !!r.rating);
+  // CLIENTE: hide FINALIZADA without rating — they still need to complete pay+rate in the dashboard.
+  // PROVEEDOR / ADMIN: show all terminal requests regardless of rating state.
+  const displayed = user?.role === 'CLIENTE'
+    ? base.filter(r => r.status !== 'FINALIZADA' || !!r.rating)
+    : base;
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
