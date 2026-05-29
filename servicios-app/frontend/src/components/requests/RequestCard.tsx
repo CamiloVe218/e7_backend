@@ -26,10 +26,12 @@ const PAYMENT_LABEL: Record<string, string> = {
 
 function CancelModal({
   paymentMethod,
+  isLateCancellation,
   onConfirm,
   onDismiss,
 }: {
   paymentMethod: string;
+  isLateCancellation: boolean;
   onConfirm: () => void;
   onDismiss: () => void;
 }) {
@@ -58,7 +60,20 @@ function CancelModal({
             Esta solicitud será cancelada y el proveedor será notificado de inmediato.
           </p>
 
-          {/* Cancellation notice */}
+          {/* Late cancellation fee warning */}
+          {isLateCancellation && (
+            <div className="mt-4 px-4 py-3.5 rounded-xl border bg-red-50 border-red-100 text-red-800 text-sm leading-relaxed flex items-start gap-2.5">
+              <svg className="w-4 h-4 text-red-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>
+                El servicio ya fue aceptado por un proveedor. Al cancelar, se aplicará un{' '}
+                <strong>cargo de $100 MXN</strong> en tu próxima solicitud por cancelación tardía.
+              </span>
+            </div>
+          )}
+
+          {/* Standard notice */}
           <div className="mt-4 px-4 py-3.5 rounded-xl border bg-amber-50 border-amber-100 text-amber-800 text-sm leading-relaxed">
             {isCard
               ? 'Si ya se procesó un pago, el reembolso puede tardar entre 3 y 5 días hábiles.'
@@ -397,6 +412,7 @@ export function RequestCard({ request, role, onAccept, onUpdateStatus, onRateCom
       {showCancelModal && (
         <CancelModal
           paymentMethod={request.paymentMethod || 'EFECTIVO'}
+          isLateCancellation={['ACEPTADA', 'EN_PROCESO'].includes(request.status)}
           onConfirm={handleConfirmCancel}
           onDismiss={() => setShowCancelModal(false)}
         />

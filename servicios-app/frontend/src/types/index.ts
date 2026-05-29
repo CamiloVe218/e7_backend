@@ -16,6 +16,7 @@ export interface User {
   role: Role;
   phone?: string;
   isSuspended?: boolean;
+  pendingCancellationFee?: boolean;
   // Address
   street?: string;
   extNumber?: string;

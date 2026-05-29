@@ -10,6 +10,7 @@ export interface AuthenticatedUser {
   // are unaffected. Added so GET /auth/me can power address auto-fill.
   phone?: string | null;
   isSuspended?: boolean;
+  pendingCancellationFee?: boolean;
   street?: string | null;
   extNumber?: string | null;
   state?: string | null;

@@ -55,7 +55,7 @@ function StatPill({ label, value, accent }: { label: string; value: number; acce
 }
 
 export default function ClientDashboard() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { success, error: toastError, info } = useToast();
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [services, setServices] = useState<Service[]>([]);
@@ -95,7 +95,9 @@ export default function ClientDashboard() {
     setActionLoading(true);
     try {
       await requestsApi.updateStatus(id, 'CANCELADA');
-      await fetchData();
+      // Refresh both requests and user — the backend may have set
+      // pendingCancellationFee = true on a late cancellation.
+      await Promise.all([fetchData(), refreshUser()]);
     } catch (err: any) {
       toastError(err.message || 'Error al cancelar la solicitud');
     } finally {
@@ -111,6 +113,19 @@ export default function ClientDashboard() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-10">
+
+      {/* Pending cancellation fee banner */}
+      {user?.pendingCancellationFee && (
+        <div className="flex items-start gap-3 px-4 py-3.5 rounded-xl bg-amber-50 border border-amber-200">
+          <svg className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-sm text-amber-800 leading-relaxed">
+            <strong>Cargo pendiente:</strong> Tu próxima solicitud tendrá un cargo adicional de{' '}
+            <strong>$100 MXN</strong> por cancelación tardía de un servicio ya aceptado.
+          </p>
+        </div>
+      )}
 
       {/* Page header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">

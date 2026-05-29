@@ -16,6 +16,9 @@ const mockTx = {
   provider: {
     update: jest.fn(),
   },
+  user: {
+    update: jest.fn(),
+  },
 };
 
 const mockRepository = {

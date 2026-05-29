@@ -36,7 +36,8 @@ model User {
   name        String
   role        Role     @default(CLIENTE)
   phone       String?
-  isSuspended Boolean  @default(false)
+  isSuspended          Boolean  @default(false)
+  pendingCancellationFee Boolean @default(false)
   // Address fields — optional, captured at registration
   street      String?
   extNumber   String?

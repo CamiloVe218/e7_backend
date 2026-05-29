@@ -195,8 +195,15 @@ export class ServiceRequestsService {
 
     const isTerminal = dto.status === 'FINALIZADA' || dto.status === 'CANCELADA';
 
-    // Wrap both the status update and the provider availability reset in a
-    // single transaction so they either both succeed or both fail.
+    // A "late cancellation" is when the CLIENT cancels after a provider already
+    // accepted the job. The client is penalised with a $100 MXN fee on their
+    // next request (tracked via User.pendingCancellationFee).
+    const isLateCancellation =
+      isClient &&
+      dto.status === 'CANCELADA' &&
+      ['ACEPTADA', 'EN_PROCESO'].includes(request.status);
+
+    // Wrap status update, provider reset, and optional fee flag in one transaction.
     const updated = await this.repository.transaction(async (tx) => {
       const result = await tx.serviceRequest.update({
         where: { id: requestId },
@@ -208,6 +215,13 @@ export class ServiceRequestsService {
         await tx.provider.update({
           where: { id: request.providerId },
           data: { isAvailable: true },
+        });
+      }
+
+      if (isLateCancellation) {
+        await tx.user.update({
+          where: { id: request.clientId },
+          data: { pendingCancellationFee: true },
         });
       }
 

@@ -5,7 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 const mockUser = {
   id: 'u1', email: 'test@test.com', name: 'Test', role: 'CLIENTE',
-  phone: '9511234567', isSuspended: false,
+  phone: '9511234567', isSuspended: false, pendingCancellationFee: false,
   street: 'Av. Independencia', extNumber: '123',
   state: 'Oaxaca', city: 'Oaxaca de Juárez', zipCode: '68000',
 };
@@ -47,7 +47,7 @@ describe('JwtStrategy', () => {
         where: { id: 'u1' },
         select: {
           id: true, email: true, name: true, role: true,
-          phone: true, isSuspended: true,
+          phone: true, isSuspended: true, pendingCancellationFee: true,
           street: true, extNumber: true, state: true, city: true, zipCode: true,
         },
       });
