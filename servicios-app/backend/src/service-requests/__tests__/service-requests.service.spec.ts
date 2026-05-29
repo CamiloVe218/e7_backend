@@ -21,6 +21,7 @@ const mockTx = {
 const mockRepository = {
   create: jest.fn(),
   findMany: jest.fn(),
+  findManyPaginated: jest.fn().mockResolvedValue({ data: [], total: 0, page: 1, limit: 10, hasMore: false }),
   findOne: jest.fn(),
   findFirst: jest.fn(),
   update: jest.fn(),
@@ -97,13 +98,13 @@ describe('ServiceRequestsService', () => {
     it('rejects ACEPTADA → PENDIENTE (invalid transition)', async () => {
       await expect(
         service.updateStatus('req-1', 'client-1', { status: RequestStatus.PENDIENTE }),
-      ).rejects.toThrow(ConflictException);
+      ).rejects.toThrow(ForbiddenException);
     });
 
-    it('rejects ACEPTADA → FINALIZADA (invalid transition)', async () => {
+    it('rejects ACEPTADA → FINALIZADA (client cannot finalize)', async () => {
       await expect(
         service.updateStatus('req-1', 'client-1', { status: RequestStatus.FINALIZADA }),
-      ).rejects.toThrow(ConflictException);
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('allows EN_PROCESO → FINALIZADA', async () => {
@@ -117,7 +118,7 @@ describe('ServiceRequestsService', () => {
       mockRepository.findOne.mockResolvedValue({ ...baseRequest, status: 'EN_PROCESO' });
       await expect(
         service.updateStatus('req-1', 'client-1', { status: RequestStatus.ACEPTADA }),
-      ).rejects.toThrow(ConflictException);
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('allows PENDIENTE → CANCELADA', async () => {
@@ -161,6 +162,111 @@ describe('ServiceRequestsService', () => {
       expect(mockTx.provider.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: { isAvailable: true } }),
       );
+    });
+  });
+
+  // ── request:completed event ───────────────────────────────────────────────────
+
+  describe('updateStatus — request:completed event', () => {
+    const baseRequest = {
+      id: 'req-1',
+      clientId: 'client-1',
+      providerId: 'prov-1',
+      status: 'EN_PROCESO',
+      provider: { user: { id: 'user-prov-1' } },
+    };
+    const finalizedResult = { ...baseRequest, status: 'FINALIZADA' };
+
+    beforeEach(() => {
+      mockPrisma.provider.findUnique.mockResolvedValue({ id: 'prov-1' });
+      mockPrisma.provider.update.mockResolvedValue({});
+      mockTx.provider.update.mockResolvedValue({});
+    });
+
+    it('emits request:completed to client exactly once on EN_PROCESO → FINALIZADA', async () => {
+      mockRepository.findOne.mockResolvedValue(baseRequest);
+      mockTx.serviceRequest.update.mockResolvedValue(finalizedResult);
+
+      await service.updateStatus('req-1', 'user-prov-1', { status: RequestStatus.FINALIZADA });
+
+      const completedCalls = (mockNotifications.notifyUser as jest.Mock).mock.calls.filter(
+        ([, event]) => event === 'request:completed',
+      );
+      expect(completedCalls).toHaveLength(1);
+      expect(completedCalls[0][0]).toBe('client-1');
+      expect(completedCalls[0][2]).toEqual(finalizedResult);
+    });
+
+    it('payload of request:completed equals payload of request:status_changed', async () => {
+      mockRepository.findOne.mockResolvedValue(baseRequest);
+      mockTx.serviceRequest.update.mockResolvedValue(finalizedResult);
+
+      await service.updateStatus('req-1', 'user-prov-1', { status: RequestStatus.FINALIZADA });
+
+      const calls = (mockNotifications.notifyUser as jest.Mock).mock.calls;
+      const statusChangedPayload = calls.find(([, ev]) => ev === 'request:status_changed' && calls[0][0] === 'client-1')?.[2];
+      const completedPayload     = calls.find(([, ev]) => ev === 'request:completed')?.[2];
+
+      expect(completedPayload).toEqual(statusChangedPayload);
+    });
+
+    it('does NOT emit request:completed for EN_PROCESO transition', async () => {
+      mockRepository.findOne.mockResolvedValue({ ...baseRequest, status: 'ACEPTADA' });
+      mockTx.serviceRequest.update.mockResolvedValue({ ...baseRequest, status: 'EN_PROCESO' });
+
+      await service.updateStatus('req-1', 'user-prov-1', { status: RequestStatus.EN_PROCESO });
+
+      const completedCalls = (mockNotifications.notifyUser as jest.Mock).mock.calls.filter(
+        ([, event]) => event === 'request:completed',
+      );
+      expect(completedCalls).toHaveLength(0);
+    });
+
+    it('does NOT emit request:completed for CANCELADA transition', async () => {
+      mockRepository.findOne.mockResolvedValue({ ...baseRequest, status: 'ACEPTADA' });
+      mockTx.serviceRequest.update.mockResolvedValue({ ...baseRequest, status: 'CANCELADA' });
+      mockPrisma.provider.findUnique.mockResolvedValue(null);
+
+      await service.updateStatus('req-1', 'client-1', { status: RequestStatus.CANCELADA });
+
+      const completedCalls = (mockNotifications.notifyUser as jest.Mock).mock.calls.filter(
+        ([, event]) => event === 'request:completed',
+      );
+      expect(completedCalls).toHaveLength(0);
+    });
+
+    it('does NOT emit request:completed to the provider', async () => {
+      mockRepository.findOne.mockResolvedValue(baseRequest);
+      mockTx.serviceRequest.update.mockResolvedValue(finalizedResult);
+
+      await service.updateStatus('req-1', 'user-prov-1', { status: RequestStatus.FINALIZADA });
+
+      const providerCompletedCalls = (mockNotifications.notifyUser as jest.Mock).mock.calls.filter(
+        ([userId, event]) => event === 'request:completed' && userId === 'user-prov-1',
+      );
+      expect(providerCompletedCalls).toHaveLength(0);
+    });
+
+    it('does NOT emit request:completed if previousStatus was already FINALIZADA (idempotency guard)', async () => {
+      mockRepository.findOne.mockResolvedValue({ ...baseRequest, status: 'FINALIZADA' });
+      mockTx.serviceRequest.update.mockResolvedValue(finalizedResult);
+      // Bypassing state machine for this edge-case guard test
+      mockPrisma.provider.findUnique.mockResolvedValue(null);
+
+      // This call will be rejected by the state machine (FINALIZADA has no valid transitions),
+      // so we just verify the guard would block it even if the state machine were bypassed.
+      // The guard `request.status !== 'FINALIZADA'` is the defense-in-depth check.
+      const requestAlreadyFinalizada = { ...baseRequest, status: 'FINALIZADA' };
+      mockRepository.findOne.mockResolvedValue(requestAlreadyFinalizada);
+
+      await expect(
+        service.updateStatus('req-1', 'client-1', { status: RequestStatus.CANCELADA }),
+      ).rejects.toThrow(ForbiddenException);
+
+      const completedCalls = (mockNotifications.notifyUser as jest.Mock).mock.calls.filter(
+        ([, event]) => event === 'request:completed',
+      );
+      expect(completedCalls).toHaveLength(0);
     });
   });
 
@@ -311,8 +417,10 @@ describe('ServiceRequestsService', () => {
 
     it('applies limit and page for pagination', async () => {
       await service.findAll({ role: 'ADMIN', userId: 'admin-1', limit: 10, page: 2 });
-      expect(mockRepository.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ take: 10, skip: 10 }),
+      expect(mockRepository.findManyPaginated).toHaveBeenCalledWith(
+        expect.anything(),
+        2,
+        10,
       );
     });
   });

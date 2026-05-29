@@ -80,12 +80,15 @@ export class ServiceRequestsService {
       }
     }
 
-    const take = filters.limit;
-    const skip = filters.limit && filters.page
-      ? (filters.page - 1) * filters.limit
-      : undefined;
+    if (filters.limit && filters.page) {
+      return this.repository.findManyPaginated(
+        { where },
+        filters.page,
+        filters.limit,
+      );
+    }
 
-    return this.repository.findMany({ where, take, skip });
+    return this.repository.findMany({ where });
   }
 
   async findOne(id: string) {
@@ -172,16 +175,21 @@ export class ServiceRequestsService {
       throw new ForbiddenException('No tienes permisos para modificar esta solicitud');
     }
 
-    const validTransitions: Record<string, string[]> = {
+    const CLIENT_TRANSITIONS: Record<string, string[]> = {
       PENDIENTE:  ['CANCELADA'],
-      ACEPTADA:   ['EN_PROCESO', 'CANCELADA'],
-      EN_PROCESO: ['FINALIZADA', 'CANCELADA'],
+      ACEPTADA:   ['CANCELADA'],
+      EN_PROCESO: ['CANCELADA'],
+    };
+    const PROVIDER_TRANSITIONS: Record<string, string[]> = {
+      ACEPTADA:   ['EN_PROCESO'],
+      EN_PROCESO: ['FINALIZADA'],
     };
 
-    const allowed = validTransitions[request.status];
-    if (!allowed || !allowed.includes(dto.status)) {
-      throw new ConflictException(
-        `No se puede cambiar de ${request.status} a ${dto.status}`,
+    const allowedTransitions = isClient ? CLIENT_TRANSITIONS : PROVIDER_TRANSITIONS;
+    const allowed = allowedTransitions[request.status] ?? [];
+    if (!allowed.includes(dto.status)) {
+      throw new ForbiddenException(
+        `Transición no permitida: ${request.status} → ${dto.status}`,
       );
     }
 
@@ -206,6 +214,7 @@ export class ServiceRequestsService {
       return result;
     });
 
+    // Payload is the same `updated` object for all events — consistent structure.
     this.notifications.notifyUser(request.clientId, 'request:status_changed', updated);
     if (request.provider) {
       this.notifications.notifyUser(
@@ -215,6 +224,13 @@ export class ServiceRequestsService {
       );
     }
     this.notifications.notifyAll('request:updated', updated);
+
+    // Emit request:completed only on the exact EN_PROCESO → FINALIZADA transition.
+    // Guard on previousStatus prevents duplicate emissions if the same status is
+    // somehow sent twice (idempotency).
+    if (request.status !== 'FINALIZADA' && dto.status === 'FINALIZADA') {
+      this.notifications.notifyUser(request.clientId, 'request:completed', updated);
+    }
 
     return updated;
   }

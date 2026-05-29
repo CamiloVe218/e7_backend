@@ -7,9 +7,9 @@ import { RequestCard } from '@/components/requests/RequestCard';
 import { ServiceRequestDrawer } from '@/components/requests/ServiceRequestDrawer';
 import { useSocketEvents } from '@/hooks/useSocket';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/contexts/ToastContext';
 import { getCatalogForService, SERVICE_LABELS } from '@/lib/catalog';
 import { formatCurrency } from '@/lib/utils';
-import { ToastContainer } from '@/components/ui/Toast';
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -37,7 +37,7 @@ function EmptyRequests({ onNew }: { onNew: () => void }) {
       </div>
       <button
         onClick={onNew}
-        className="mt-1 h-8 px-4 text-xs font-semibold rounded-lg bg-gray-900 hover:bg-gray-800 text-white transition-colors"
+        className="mt-1 h-9 px-4 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
       >
         Nueva solicitud
       </button>
@@ -45,23 +45,32 @@ function EmptyRequests({ onNew }: { onNew: () => void }) {
   );
 }
 
+function StatPill({ label, value, accent }: { label: string; value: number; accent: string }) {
+  return (
+    <div className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl">
+      <span className={`text-lg font-bold tabular-nums font-tight ${accent}`}>{value}</span>
+      <span className="text-xs text-gray-400 leading-tight">{label}</span>
+    </div>
+  );
+}
+
 export default function ClientDashboard() {
   const { user } = useAuth();
+  const { success, error: toastError, info } = useToast();
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [preselectedId, setPreselectedId] = useState<string | undefined>();
-  const [toast, setToast] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
       const [reqs, svcs] = await Promise.all([requestsApi.getAll(), servicesApi.getAll()]);
       setRequests(reqs);
       setServices(svcs);
-    } catch (err) {
-      console.error(err);
+    } catch {
+      // silent — user stays on stale data
     } finally {
       setLoading(false);
     }
@@ -69,14 +78,11 @@ export default function ClientDashboard() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 6000);
-  };
-
   useSocketEvents({
-    'request:accepted':       () => { showToast('Tu solicitud fue aceptada por un proveedor.'); fetchData(); },
-    'request:status_changed': () => fetchData(),
+    'request:accepted':       () => { success('¡Tu solicitud fue aceptada por un proveedor!'); fetchData(); },
+    'request:status_changed': () => { fetchData(); },
+    // request:status_changed already refreshes data; this handler only shows the toast.
+    'request:completed':      () => { info('Tu servicio ha sido completado.'); },
   });
 
   const openDrawer = (serviceId?: string) => {
@@ -91,23 +97,25 @@ export default function ClientDashboard() {
       await requestsApi.updateStatus(id, 'CANCELADA');
       await fetchData();
     } catch (err: any) {
-      showToast(err.message);
+      toastError(err.message || 'Error al cancelar la solicitud');
     } finally {
       setActionLoading(false);
     }
   };
 
   const firstName = user?.name?.split(' ')[0] ?? 'Cliente';
-  const active = requests.filter(r => ['PENDIENTE', 'ACEPTADA', 'EN_PROCESO'].includes(r.status));
+  const active    = requests.filter(r => ['PENDIENTE', 'ACEPTADA', 'EN_PROCESO', 'FINALIZADA'].includes(r.status) && !r.rating);
+  const pending   = requests.filter(r => r.status === 'PENDIENTE').length;
+  const inProg    = requests.filter(r => ['ACEPTADA', 'EN_PROCESO'].includes(r.status)).length;
+  const done      = requests.filter(r => r.status === 'FINALIZADA').length;
 
   return (
     <div className="max-w-5xl mx-auto space-y-10">
 
-      <ToastContainer message={toast} onClose={() => setToast(null)} />
-
       {/* Page header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
+          <p className="text-xs font-bold tracking-[0.08em] uppercase text-blue-600 mb-1">Cliente</p>
           <h1 className="font-tight text-2xl font-bold text-gray-900 tracking-tight">
             Hola, {firstName}
           </h1>
@@ -115,7 +123,7 @@ export default function ClientDashboard() {
         </div>
         <button
           onClick={() => openDrawer()}
-          className="flex items-center gap-2 h-9 px-4 text-sm font-semibold rounded-xl bg-gray-900 hover:bg-gray-800 active:scale-[0.97] text-white transition-all duration-150 shrink-0"
+          className="flex items-center gap-2 h-9 px-4 text-sm font-semibold rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.97] text-white transition-all duration-150 shrink-0"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
@@ -123,6 +131,15 @@ export default function ClientDashboard() {
           Nueva solicitud
         </button>
       </div>
+
+      {/* Stats strip */}
+      {!loading && requests.length > 0 && (
+        <div className="flex gap-2 flex-wrap animate-fade-in">
+          <StatPill label="En espera"   value={pending} accent="text-amber-600" />
+          <StatPill label="En proceso"  value={inProg}  accent="text-blue-600" />
+          <StatPill label="Finalizadas" value={done}    accent="text-emerald-600" />
+        </div>
+      )}
 
       {/* Active requests */}
       <div>
@@ -146,6 +163,7 @@ export default function ClientDashboard() {
                 request={req}
                 role="CLIENTE"
                 onUpdateStatus={handleCancelRequest}
+                onRateComplete={fetchData}
                 loading={actionLoading}
               />
             ))}
@@ -172,12 +190,12 @@ export default function ClientDashboard() {
                 <button
                   key={service.id}
                   onClick={() => openDrawer(service.id)}
-                  className="group text-left bg-white border border-gray-200 hover:border-gray-300 hover:shadow-md rounded-xl p-4 transition-all duration-200 ease-premium active:scale-[0.98]"
+                  className="group text-left bg-white border border-gray-200 hover:border-blue-200 hover:shadow-md rounded-xl p-4 transition-all duration-200 active:scale-[0.98]"
                 >
                   <div className="flex items-start justify-between gap-1 mb-1.5">
                     <p className="text-sm font-semibold text-gray-900 leading-tight">{label}</p>
                     <svg
-                      className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-500 transition-colors shrink-0 mt-0.5"
+                      className="w-3.5 h-3.5 text-gray-300 group-hover:text-blue-400 transition-colors shrink-0 mt-0.5"
                       fill="none" viewBox="0 0 24 24" stroke="currentColor"
                     >
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
